@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests
+        run: pytest tests/ -v --tb=short
+
+      - name: Smoke test short simulation
+        run: |
+          python - <<'PY'
+          from src.bandits.thompson import ThompsonSampling
+          from src.simulate_run import run_simulation
+          from src.simulator import generate_users
+
+          users_df = generate_users(n=100, seed=11)
+          results_df = run_simulation(ThompsonSampling(), users_df, n_months=3, seed=11)
+          assert not results_df.empty
+          assert results_df["reward_received"].sum() > 0
+          print("smoke_test_ok")
+          PY

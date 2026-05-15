@@ -24,6 +24,8 @@ class UCBBandit(ContextualBandit):
     def select_action(self, context: np.ndarray, user_id: str, actions: list[str]) -> str:
         if not actions:
             raise ValueError("actions must not be empty")
+        if context is None or not np.isfinite(np.asarray(context, dtype=float)).all():
+            raise ValueError("context must contain only finite values")
 
         self.total_selections += 1
 
@@ -48,6 +50,8 @@ class UCBBandit(ContextualBandit):
         return best_action
 
     def update(self, user_id: str, action: str, reward: float, context: np.ndarray) -> None:
+        if context is None or not np.isfinite(np.asarray(context, dtype=float)).all():
+            raise ValueError("context must contain only finite values")
         key = self._key(user_id, action)
         current_count = self.counts.get(key, 0)
         current_mean = self.rewards.get(key, 0.0)

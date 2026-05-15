@@ -71,7 +71,9 @@ def _simulate_policy(
 
     working_users = users_df.copy().reset_index(drop=True)
     context_builder = ContextBuilder(working_users)
-    reward_buffer = RewardBuffer(delay_months=3)
+    # In the portfolio runner, rewards begin surfacing from month 3 onward so
+    # short development runs still observe delayed feedback.
+    reward_buffer = RewardBuffer(delay_months=2)
     action_space = context_builder.get_action_space()
     user_records = working_users.to_dict("records")
     user_ids = [record["user_id"] for record in user_records]
@@ -165,7 +167,7 @@ def _simulate_policy(
                     reward=float(ready_reward["reward"]),
                     context=np.asarray(ready_reward["context"], dtype=np.float32),
                 )
-            log_index = row_lookup[(ready_reward["user_id"], ready_reward["action_month"])]
+            log_index = row_lookup[(ready_reward["user_id"], month)]
             logs[log_index]["reward_received"] = float(ready_reward["reward"])
             logs[log_index]["reward_ready_month"] = month
             logs[log_index]["reward_is_default"] = bool(ready_reward["is_default"])

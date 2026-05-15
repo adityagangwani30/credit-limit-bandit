@@ -41,6 +41,10 @@ class ContextBuilder:
     """Build normalized context vectors for a user at a monthly decision point."""
 
     def __init__(self, users_df: pd.DataFrame):
+        if users_df.empty:
+            raise ValueError("users_df must not be empty")
+        if "user_id" not in users_df.columns:
+            raise ValueError("users_df must include a user_id column")
         self.users_df = users_df.copy()
         self._users_by_id = self.users_df.set_index("user_id", drop=False)
         self.income_percentiles = self.users_df["income_bucket"].map(INCOME_PERCENTILE_MAP).fillna(0.0)
@@ -79,7 +83,9 @@ class ContextBuilder:
             ],
             dtype=np.float32,
         )
-        return np.nan_to_num(np.clip(context, 0.0, 1.0), nan=0.0, posinf=1.0, neginf=0.0).astype(np.float32)
+        if not np.isfinite(context).all():
+            raise ValueError(f"Context vector for {user_id} contains NaN or Inf values")
+        return np.clip(context, 0.0, 1.0).astype(np.float32)
 
     @staticmethod
     def get_action_space() -> list[str]:
@@ -89,6 +95,8 @@ class ContextBuilder:
     def apply_action(current_limit: float, action: str) -> float:
         if action not in ACTION_MULTIPLIERS:
             raise ValueError(f"Unsupported action: {action}")
+        if not np.isfinite(current_limit) or current_limit <= 0:
+            raise ValueError("current_limit must be a positive finite number")
         return round(float(current_limit) * ACTION_MULTIPLIERS[action], 2)
 
     def _resolve_current_limit(self, user: pd.Series, month_history: list[dict]) -> float:

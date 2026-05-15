@@ -22,7 +22,7 @@ from src.reward import RewardBuffer
 from src.simulator import simulate_month
 
 
-st.set_page_config(title="Credit Limit Bandit Dashboard", layout="wide", page_icon="💳")
+st.set_page_config(page_title="Credit Limit Bandit Dashboard", layout="wide", page_icon="💳")
 
 POLICY_LABELS = {
     "thompson_sampling": "Thompson",
@@ -221,7 +221,7 @@ def run_live_thompson_simulation(
                 float(ready_reward["reward"]),
                 np.asarray(ready_reward["context"], dtype=np.float32),
             )
-            logs[row_lookup[(ready_reward["user_id"], ready_reward["action_month"])]]["reward_received"] = float(
+            logs[row_lookup[(ready_reward["user_id"], month)]]["reward_received"] = float(
                 ready_reward["reward"]
             )
 

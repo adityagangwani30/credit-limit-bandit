@@ -15,10 +15,14 @@ class RewardEngine:
 
     @staticmethod
     def calculate_immediate_fee(amount_spent: float) -> float:
+        if float(amount_spent) < 0:
+            raise ValueError("amount_spent must be >= 0")
         return float(amount_spent) * INTERCHANGE_RATE
 
     @staticmethod
     def calculate_default_penalty(outstanding_amount: float, did_default: bool) -> float:
+        if float(outstanding_amount) < 0:
+            raise ValueError("outstanding_amount must be >= 0")
         return -float(outstanding_amount) if did_default else 0.0
 
     @classmethod
@@ -61,6 +65,8 @@ class RewardBuffer:
         self._released_keys: set[tuple[str, int]] = set()
 
     def record_action(self, user_id, month, action, context) -> None:
+        if int(month) < 1:
+            raise ValueError("month must be >= 1")
         self._pending_actions.append(
             _RecordedAction(
                 user_id=str(user_id),
@@ -71,6 +77,10 @@ class RewardBuffer:
         )
 
     def receive_outcome(self, user_id, month, amount_spent, outstanding_amount, did_default) -> None:
+        if int(month) < 1:
+            raise ValueError("month must be >= 1")
+        if float(outstanding_amount) < 0:
+            raise ValueError("outstanding_amount must be >= 0")
         self._outcomes[(str(user_id), int(month))] = _RecordedOutcome(
             amount_spent=float(amount_spent),
             outstanding_amount=float(outstanding_amount),

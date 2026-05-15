@@ -235,6 +235,8 @@ def _sample_user(
 def generate_users(n: int = 10000, seed: int = 42) -> pd.DataFrame:
     """Generate a reproducible synthetic user portfolio."""
 
+    if n <= 0:
+        raise ValueError("n must be > 0")
     generator = _rng(seed)
     risk_tiers = generator.choice(RISK_TIER_ORDER, size=n, p=list(RISK_TIER_WEIGHTS.values()))
     users = [_sample_user(generator, index, risk_tier) for index, risk_tier in enumerate(risk_tiers, start=1)]
@@ -252,21 +254,27 @@ def simulate_month(
         raise ValueError("month_num must be >= 1")
     if economic_stress <= 0:
         raise ValueError("economic_stress must be > 0")
+    if "initial_credit_limit" not in users_df.columns:
+        raise ValueError("users_df must include an initial_credit_limit column")
 
     month_seed = 10_000 + month_num
     generator = _rng(month_seed)
     working_df = users_df.copy()
+    credit_limits = working_df["initial_credit_limit"].to_numpy(dtype=float)
+    if np.any(~np.isfinite(credit_limits)) or np.any(credit_limits <= 0):
+        raise ValueError("initial_credit_limit values must all be positive finite numbers")
 
     target_ratio = generator.normal(loc=0.60, scale=0.12, size=len(working_df))
     spend_scaler = working_df["income_bucket"].map(INCOME_SPEND_MULTIPLIER).to_numpy(dtype=float)
-    amount_spent = working_df["initial_credit_limit"].to_numpy(dtype=float) * np.clip(
+    amount_spent = credit_limits * np.clip(
         target_ratio * spend_scaler,
         0.40,
         0.80,
     )
+    amount_spent = np.minimum(amount_spent, credit_limits)
 
     current_utilization = np.clip(
-        amount_spent / working_df["initial_credit_limit"].to_numpy(dtype=float),
+        amount_spent / credit_limits,
         0.0,
         1.0,
     )
