@@ -38,8 +38,8 @@ git clone https://github.com/your-username/credit-limit-bandit.git
 cd credit-limit-bandit
 python -m venv .venv
 source .venv/bin/activate  # macOS/Linux
-# .venv\Scripts\activate   # Windows
-pip install -r requirements.txt
+# .\.venv\Scripts\Activate.ps1   # Windows PowerShell
+python -m pip install -r requirements.txt
 ```
 
 Generate the synthetic users:
@@ -57,13 +57,13 @@ python -m src.simulate_run --policy thompson
 Run the dashboard locally:
 
 ```bash
-streamlit run dashboard/app.py
+python -m streamlit run dashboard/app.py
 ```
 
 Run the test suite:
 
 ```bash
-pytest tests/ -v --tb=short
+python -m pytest tests/ -v --tb=short
 ```
 
 ## Results
