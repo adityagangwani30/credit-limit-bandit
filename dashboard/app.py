@@ -443,7 +443,7 @@ def render_portfolio_overview(results_df: pd.DataFrame, users_df: pd.DataFrame) 
             fig3.add_trace(go.Bar(x=adf["month"], y=adf["pct"], name=action,
                                   marker_color=ACTION_COLORS.get(action, "#888")))
         fig3.update_layout(barmode="stack")
-        dark_chart(fig3, title="Thompson Sampling â€” Action Distribution (%)", height=360)
+        dark_chart(fig3, title="Thompson Sampling – Action Distribution (%)", height=360)
         st.plotly_chart(fig3, use_container_width=True)
 
     with tab_tier:
@@ -872,7 +872,7 @@ def render_sidebar():
             💳 Credit Limit Bandit</div>
           <div style="font-size:10px;color:#4a5568;margin-top:3px;
                       text-transform:uppercase;letter-spacing:0.06em">
-            Contextual RL Â· Fintech</div>
+            Contextual RL · Fintech</div>
         </div>""", unsafe_allow_html=True)
 
         st.divider()
@@ -911,8 +911,8 @@ def render_sidebar():
         st.markdown(f"""
         <div style="position:absolute;bottom:16px;left:16px;right:16px;
                     font-size:10px;color:#2a3050;text-align:center">
-          Thompson Sampling Â· UCB Â· Îµ-Greedy<br/>
-          <a href="{GITHUB_URL}" style="color:#3b82f6;text-decoration:none">GitHub â†—</a>
+          Thompson Sampling · UCB · ε-Greedy<br/>
+          <a href="{GITHUB_URL}" style="color:#3b82f6;text-decoration:none">GitHub ↗</a>
         </div>""", unsafe_allow_html=True)
 
     return page
