@@ -8,7 +8,7 @@
 
 ## 🚀 Live Demo
 
-🚀 [Launch Streamlit App](YOUR_STREAMLIT_URL)
+🚀 [Launch Streamlit App](https://credit-limit-banditgit.streamlit.app/)
 
 Explore real-time credit limit recommendations across 10,000 simulated users with interactive policy comparisons, regret analysis, and performance dashboards.
 
