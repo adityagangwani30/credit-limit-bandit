@@ -135,6 +135,7 @@ section[data-testid="stSidebar"] .stRadio label:hover {
 [data-testid="stMetricLabel"] {
     font-size: 10px !important; text-transform: uppercase !important;
     letter-spacing: 0.06em !important; color: #4a5568 !important; font-weight: 500 !important;
+    white-space: normal !important; word-wrap: break-word !important; line-height: 1.2 !important;
 }
 [data-testid="stMetricValue"] {
     font-size: 22px !important; font-weight: 600 !important;
@@ -362,8 +363,8 @@ def run_live_thompson_simulation(
 # â”€â”€ PAGE 1: Portfolio Overview â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def render_portfolio_overview(results_df: pd.DataFrame, users_df: pd.DataFrame) -> None:
     page_header("Portfolio Overview",
-                "12-month simulation Â· All policies vs static baseline",
-                badge_text="â— Live")
+                "12-month simulation · All policies vs static baseline",
+                badge_text="● Live")
 
     thompson_df = results_df.loc[results_df["policy"] == "thompson_sampling"]
     static_df = results_df.loc[results_df["policy"] == "static_baseline"]
@@ -386,16 +387,16 @@ def render_portfolio_overview(results_df: pd.DataFrame, users_df: pd.DataFrame) 
             break
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Total Revenue (Thompson)", format_inr(total_revenue),
+    c1.metric("Revenue", format_inr(total_revenue),
               f"+{revenue_lift:.1f}% vs static")
-    c2.metric("Default Rate", f"{default_rate:.2f}%",
+    c2.metric("Defaults", f"{default_rate:.2f}%",
               "Within 4% threshold" if default_rate <= 4 else "Above threshold",
               delta_color="normal" if default_rate <= 4 else "inverse")
-    c3.metric("Regret vs Oracle", f"{regret_pct:.1f}%",
+    c3.metric("Regret", f"{regret_pct:.1f}%",
               "Below 20% target" if regret_pct < 20 else "Above 20% target",
               delta_color="normal" if regret_pct < 20 else "inverse")
-    c4.metric("Convergence Month", f"Month {conv_month}",
-              f"{conv_month} months of active learning")
+    c4.metric("Convergence", f"Month {conv_month}",
+              f"{conv_month}mo learning")
 
     # Tabs
     tab_rev, tab_def, tab_act, tab_tier = st.tabs(["Revenue", "Default Rate", "Actions Taken", "By Risk Tier"])
