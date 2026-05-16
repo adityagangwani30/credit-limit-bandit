@@ -24,3 +24,8 @@ dev = [
     "ipykernel",
     "pytest",
 ]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
