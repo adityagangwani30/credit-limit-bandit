@@ -48,11 +48,11 @@ Detailed results from your 12-month simulation appear below. Fill in values from
 
 | Policy | 12-Month Revenue (INR) | Default Rate (%) | Revenue Lift vs Static | Regret vs Oracle |
 |---|---:|---:|---:|---:|
-| Thompson Sampling | [from simulation_results.csv] | [from simulation_results.csv] | [from simulation_results.csv] | [from simulation_results.csv] |
-| UCB | [from simulation_results.csv] | [from simulation_results.csv] | [from simulation_results.csv] | [from simulation_results.csv] |
-| Epsilon-Greedy | [from simulation_results.csv] | [from simulation_results.csv] | [from simulation_results.csv] | [from simulation_results.csv] |
-| Static Baseline | [from simulation_results.csv] | [from simulation_results.csv] | 0.00% | [from simulation_results.csv] |
-| Oracle Upper Bound | [from simulation_results.csv] | [from simulation_results.csv] | [from simulation_results.csv] | 0.00% |
+| Thompson Sampling | 438,620,105 | 3.38% | +370.77% | 6,600,556,686 |
+| UCB | 239,627,714 | 3.38% | +157.19% | 6,799,549,078 |
+| Epsilon-Greedy | 92,110,772 | 3.38% | −1.14% | 6,947,066,019 |
+| Static Baseline | 93,170,233 | 3.38% | 0.00% | 6,946,006,559 |
+| Oracle Upper Bound | 7,039,176,792 | 3.38% | +7455.18% | 0 |
 
 ---
 
@@ -64,7 +64,7 @@ Detailed results from your 12-month simulation appear below. Fill in values from
 └─────────────────┘         └──────────────────┘         └─────────────────┘
    Monthly CIBIL,             10-feature vector           Thompson / UCB /
    spend, utilization         (normalized)                Epsilon-Greedy
-                                      │                          │
+                                      │                           │
                                       └──────────┬────────────────┘
                                                  ↓
                                         ┌──────────────────┐
