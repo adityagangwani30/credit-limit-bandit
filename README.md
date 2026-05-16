@@ -44,15 +44,41 @@ Every month, we observe a user's financial snapshot and feed it to a bandit poli
 
 ## Results
 
-Detailed results from your 12-month simulation appear below. Fill in values from `data/simulation_results.csv` after running the full pipeline.
+### Policy Comparison (12-month simulation, 10,000 users)
 
-| Policy | 12-Month Revenue (INR) | Default Rate (%) | Revenue Lift vs Static | Regret vs Oracle |
+| Policy | Revenue (INR) | Lift vs Static | Default Rate | Exploration |
 |---|---:|---:|---:|---:|
-| Thompson Sampling | 438,620,105 | 3.38% | +370.77% | 6,600,556,686 |
-| UCB | 239,627,714 | 3.38% | +157.19% | 6,799,549,078 |
-| Epsilon-Greedy | 92,110,772 | 3.38% | −1.14% | 6,947,066,019 |
-| Static Baseline | 93,170,233 | 3.38% | 0.00% | 6,946,006,559 |
-| Oracle Upper Bound | 7,039,176,792 | 3.38% | +7455.18% | 0 |
+| Thompson Sampling | ₹43.9Cr | +370.8% | 3.38% | 75.4% |
+| UCB | ₹24.0Cr | +157.2% | 3.38% | 75.0% |
+| Epsilon-Greedy | ₹9.2Cr | −1.1% | 3.38% | 11.6% |
+| Static Baseline | ₹9.3Cr | 0% | 3.38% | 0% |
+| Oracle Upper Bound | ₹703.9Cr | +7455.2% | 3.38% | 80.5% |
+
+> **Thompson Sampling met 3 of 4 targets from the project spec:**
+> - Revenue lift >30% ✓ (achieved 370.8%)
+> - Default rate <4% ✓ (achieved 3.38%)
+> - Exploration rate 10-25% ✗ (achieved 75.4% — too aggressive)
+> - Convergence by month 5 ✓ (policy stabilized in early months)
+
+### Cohort Analysis — Which users benefit most?
+
+| Risk Tier | Revenue (Thompson) | Revenue (Static) | Lift | Default Rate |
+|---|---:|---:|---:|---:|
+| Prime | ₹56.81Cr | ₹11.72Cr | +384.7% | 0.39% |
+| Near-Prime | ₹0.64Cr | ₹0.43Cr | +46.1% | 1.85% |
+| Subprime | ₹−7.18Cr | ₹−1.52Cr | Loss | 5.87% |
+| Deep-Subprime | ₹−6.40Cr | ₹−1.31Cr | Loss | 15.32% |
+
+> **Key insight:** Prime users show the highest revenue lift (+384.7%) because they have pristine credit history (0.39% default rate), allowing the bandit to confidently increase limits with minimal downside risk. Near-Prime users follow (+46.1%), showing the sweet spot where learning speed meets profitability. Lower tiers generate net losses due to default penalties outweighing interchange revenue.
+
+### Production Resilience
+
+| Challenge | Result |
+|---|---|
+| **Cold start** (months 1–3) | Thompson bootstraps from ₹0/user to ₹1,790/user by month 3 |
+| **Economic shock** (month 6) | Default spike to 3.67%, recovered within 1 month |
+| **Non-stationarity** | Policy adapted continuously with zero manual retuning |
+| **Portfolio-wide revenue** | 438.6M INR (370.8% lift vs static baseline) |
 
 ---
 

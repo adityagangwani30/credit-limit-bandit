@@ -398,7 +398,7 @@ def render_portfolio_overview(results_df: pd.DataFrame, users_df: pd.DataFrame) 
               f"{conv_month}mo learning")
 
     # Tabs
-    tab_rev, tab_def, tab_act, tab_tier = st.tabs(["Revenue", "Default Rate", "Actions Taken", "By Risk Tier"])
+    tab_rev, tab_def, tab_act, tab_tier, tab_cohort = st.tabs(["Revenue", "Default Rate", "Actions Taken", "By Risk Tier", "Cohort Analysis"])
 
     with tab_rev:
         cumulative = monthly_cumulative_rewards(results_df)
@@ -482,6 +482,61 @@ def render_portfolio_overview(results_df: pd.DataFrame, users_df: pd.DataFrame) 
         fig4.update_layout(barmode="group")
         dark_chart(fig4, title="Revenue by Risk Tier & Policy", height=360)
         st.plotly_chart(fig4, use_container_width=True)
+
+    with tab_cohort:
+        cohort_path = PROJECT_ROOT / "data" / "cohort_results.csv"
+        if cohort_path.exists():
+            cohort_df = pd.read_csv(cohort_path)
+            
+            # Pivot: risk_tier as rows, income_bucket as columns,
+            # avg_reward_per_user as values
+            pivot = cohort_df.pivot(
+                index="risk_tier",
+                columns="income_bucket",
+                values="avg_reward_per_user"
+            )
+            
+            fig = px.imshow(
+                pivot,
+                color_continuous_scale="Blues",
+                title="Avg reward per user — Risk tier × Income bucket (Thompson)",
+                text_auto=".0f",
+                aspect="auto"
+            )
+            fig = dark_chart(fig, height=400)
+            fig.update_coloraxes(colorbar_tickprefix="₹")
+            st.plotly_chart(fig, use_container_width=True)
+            
+            st.caption(
+                "Brighter cells = higher average reward per user. "
+                "The bandit learns to give larger limit increases to "
+                "high-income Prime users where the revenue upside is greatest."
+            )
+            
+            # Also show the risk_tier × policy table
+            cohort2_path = PROJECT_ROOT / "data" / "cohort_by_tier.csv"
+            if cohort2_path.exists():
+                cohort2_df = pd.read_csv(cohort2_path)
+                thompson_static = cohort2_df[cohort2_df["policy"].isin(["thompson_sampling", "static_baseline"])]
+                
+                tier_pivot = thompson_static.pivot(
+                    index="risk_tier",
+                    columns="policy",
+                    values="total_revenue"
+                )
+                tier_pivot["lift_pct"] = (
+                    (tier_pivot["thompson_sampling"] - tier_pivot["static_baseline"]) /
+                    tier_pivot["static_baseline"].clip(lower=1) * 100
+                )
+                tier_pivot["thompson_formatted"] = tier_pivot["thompson_sampling"].apply(format_inr)
+                tier_pivot["static_formatted"] = tier_pivot["static_baseline"].apply(format_inr)
+                
+                st.subheader("Revenue Impact by Risk Tier", divider="blue")
+                display_cols = tier_pivot[["thompson_formatted", "static_formatted", "lift_pct"]].copy()
+                display_cols.columns = ["Thompson Revenue", "Static Revenue", "Lift (%)"]
+                st.dataframe(display_cols, use_container_width=True, hide_index=False)
+        else:
+            st.info("Cohort analysis data not available. Run the generation notebook first.")
 
 
 # -- PAGE 2: Per-User Deep Dive ----------------------------------------

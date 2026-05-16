@@ -1,0 +1,46 @@
+
+# Add this to the st.tabs() block in dashboard/app.py (Portfolio Overview page)
+
+with tab_cohort:
+    cohort_df = pd.read_csv("data/cohort_results.csv")
+
+    # Pivot: risk_tier as rows, income_bucket as columns,
+    # avg_reward_per_user as values
+    pivot = cohort_df.pivot(
+        index="risk_tier",
+        columns="income_bucket",
+        values="avg_reward_per_user"
+    )
+
+    fig = px.imshow(
+        pivot,
+        color_continuous_scale="Blues",
+        title="Avg reward per user — Risk tier × Income bucket (Thompson)",
+        text_auto=".0f",
+        aspect="auto"
+    )
+    fig = dark_chart(fig, height=400)
+    fig.update_coloraxes(colorbar_tickprefix="₹")
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.caption(
+        "Brighter cells = higher average reward per user. "
+        "The bandit learns to give larger limit increases to "
+        "high-income Prime users where the revenue upside is greatest."
+    )
+
+    # Also show the risk_tier × policy table
+    cohort2_df = pd.read_csv("data/cohort_by_tier.csv")
+    thompson_static = cohort2_df[cohort2_df["policy"].isin(["thompson_sampling", "static_baseline"])]
+    tier_pivot = thompson_static.pivot(
+        index="risk_tier",
+        columns="policy",
+        values="total_revenue"
+    )
+    tier_pivot["lift_pct"] = (
+        (tier_pivot["thompson_sampling"] - tier_pivot["static_baseline"]) /
+        tier_pivot["static_baseline"] * 100
+    )
+
+    st.subheader("Revenue Impact by Risk Tier")
+    st.dataframe(tier_pivot, use_container_width=True)
