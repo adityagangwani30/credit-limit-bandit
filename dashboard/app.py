@@ -195,11 +195,12 @@ hr { border-color: #1e2a45 !important; }
 
 # â”€â”€ Data loading (unchanged logic) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @st.cache_data
+@st.cache_data
 def load_simulation_results() -> pd.DataFrame:
     path = PROJECT_ROOT / "data" / "simulation_results.csv"
     if not path.exists():
         return pd.DataFrame()
-    df = pd.read_csv(path)
+    df = pd.read_csv(path, low_memory=False)
     df["policy_display"] = df["policy"].map(POLICY_LABELS).fillna(df["policy"])
     return df
 
@@ -209,7 +210,7 @@ def load_synthetic_users() -> pd.DataFrame:
     path = PROJECT_ROOT / "data" / "synthetic_users.csv"
     if not path.exists():
         return pd.DataFrame()
-    return pd.read_csv(path)
+    return pd.read_csv(path, low_memory=False)
 
 
 def require_data(results_df: pd.DataFrame, users_df: pd.DataFrame) -> bool:
