@@ -769,7 +769,7 @@ def render_live_simulation(users_df: pd.DataFrame, results_df: pd.DataFrame) -> 
             </div>""", unsafe_allow_html=True)
 
         n_months = st.select_slider("Horizon", options=[6, 9, 12], value=12)
-        run_btn = st.button("â–¶ Run Simulation", use_container_width=True)
+        run_btn = st.button("▶ Run Simulation", use_container_width=True)
 
     risk_distribution = {"Prime": prime_pct, "Near-Prime": near_prime_pct,
                          "Subprime": subprime_pct, "Deep-Subprime": max(deep_sub_pct, 0)}
