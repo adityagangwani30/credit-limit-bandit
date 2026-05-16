@@ -24,7 +24,7 @@ from src.simulator import simulate_month
 
 st.set_page_config(
     page_title="Credit Limit Bandit",
-    page_icon="ðŸ’³",
+    page_icon="💳",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -793,7 +793,7 @@ def render_live_simulation(users_df: pd.DataFrame, results_df: pd.DataFrame) -> 
             st.markdown("""
             <div style="background:#161b2e;border:1px dashed #1e2a45;
                         border-radius:10px;padding:48px;text-align:center">
-              <div style="font-size:32px;margin-bottom:12px">âš¡</div>
+              <div style="font-size:32px;margin-bottom:12px">⚡</div>
               <div style="color:#4a5568;font-size:13px">
                 Configure parameters and click Run Simulation</div>
             </div>""", unsafe_allow_html=True)
@@ -867,7 +867,7 @@ def render_sidebar():
         st.markdown("""
         <div style="padding:8px 0 16px">
           <div style="font-size:15px;font-weight:600;color:#fff;letter-spacing:-0.01em">
-            ðŸ’³ Credit Limit Bandit</div>
+            💳 Credit Limit Bandit</div>
           <div style="font-size:10px;color:#4a5568;margin-top:3px;
                       text-transform:uppercase;letter-spacing:0.06em">
             Contextual RL Â· Fintech</div>
@@ -876,8 +876,8 @@ def render_sidebar():
         st.divider()
 
         page = st.radio("Navigate",
-                        ["ðŸ’¼  Portfolio Overview", "ðŸ‘¤  Per-User Deep Dive",
-                         "ðŸ“Š  Policy Comparison", "âš¡  Live Simulation"],
+                        ["💼  Portfolio Overview", "ðŸ‘¤  Per-User Deep Dive",
+                         "📊  Policy Comparison", "⚡  Live Simulation"],
                         label_visibility="collapsed")
 
         st.divider()
@@ -924,10 +924,10 @@ def main() -> None:
     page = render_sidebar()
 
     page_map = {
-        "ðŸ’¼  Portfolio Overview": "Portfolio Overview",
+        "💼  Portfolio Overview": "Portfolio Overview",
         "ðŸ‘¤  Per-User Deep Dive": "Per-User Deep Dive",
-        "ðŸ“Š  Policy Comparison": "Policy Comparison",
-        "âš¡  Live Simulation": "Live Simulation",
+        "📊  Policy Comparison": "Policy Comparison",
+        "⚡  Live Simulation": "Live Simulation",
     }
     selected_page = page_map.get(page, "Portfolio Overview")
 
