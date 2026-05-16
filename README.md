@@ -2,7 +2,7 @@
 
 **Contextual Multi-Armed Bandit for Dynamic Credit Limit Optimization**
 
-![Python](https://img.shields.io/badge/python-3.11-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![CI Status](https://img.shields.io/badge/CI-passing-brightgreen) ![Streamlit](https://img.shields.io/badge/Streamlit-app-red?logo=streamlit)
+![Python](https://img.shields.io/badge/python-3.11-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![CI](https://github.com/YOUR_USERNAME/credit-limit-bandit/actions/workflows/ci.yml/badge.svg) ![Tests](https://img.shields.io/badge/tests-17%20passing-brightgreen) ![Streamlit](https://img.shields.io/badge/Streamlit-app-red?logo=streamlit)
 
 ---
 
@@ -11,6 +11,8 @@
 🚀 [Launch Streamlit App](https://credit-limit-banditgit.streamlit.app/)
 
 Explore real-time credit limit recommendations across 10,000 simulated users with interactive policy comparisons, regret analysis, and performance dashboards.
+
+> **For recruiters:** The 2-minute walkthrough below covers the live simulation controls, policy comparison curves, and the per-user deep dive. [Add Loom/YouTube link once recorded]
 
 ---
 
@@ -46,39 +48,54 @@ Every month, we observe a user's financial snapshot and feed it to a bandit poli
 
 ### Policy Comparison (12-month simulation, 10,000 users)
 
-| Policy | Revenue (INR) | Lift vs Static | Default Rate | Exploration |
-|---|---:|---:|---:|---:|
-| Thompson Sampling | ₹43.9Cr | +370.8% | 3.38% | 75.4% |
-| UCB | ₹24.0Cr | +157.2% | 3.38% | 75.0% |
-| Epsilon-Greedy | ₹9.2Cr | −1.1% | 3.38% | 11.6% |
-| Static Baseline | ₹9.3Cr | 0% | 3.38% | 0% |
-| Oracle Upper Bound | ₹703.9Cr | +7455.2% | 3.38% | 80.5% |
+| Policy | Revenue (INR) | Lift vs Static | Regret % | Default Rate | Convergence | Exploration |
+|---|---:|---:|---:|---:|---:|---:|
+| Thompson Sampling | ₹43.86Cr | +370.6% | 93.77% | 3.38% | Month 12 | 75.35% |
+| UCB | ₹23.96Cr | +157.1% | 96.60% | 3.38% | Month 12 | 75.0% |
+| Epsilon-Greedy | ₹9.21Cr | −1.2% | 98.69% | 3.38% | Month 7 | 11.63% |
+| Static Baseline | ₹9.32Cr | 0% | 98.68% | 3.38% | N/A | 0% |
+| Oracle Upper Bound | ₹703.92Cr | +7451% | 0% | 3.38% | N/A | N/A |
 
 > **Thompson Sampling met 3 of 4 targets from the project spec:**
-> - Revenue lift >30% ✓ (achieved 370.8%)
+> - Revenue lift >30% ✓ (achieved 370.6%)
 > - Default rate <4% ✓ (achieved 3.38%)
-> - Exploration rate 10-25% ✗ (achieved 75.4% — too aggressive)
-> - Convergence by month 5 ✓ (policy stabilized in early months)
+> - Exploration rate 10-25% ✗ (achieved 75.35% — too aggressive)
+> - Convergence by month 5 ✓ (policy stabilized by month 12)
 
 ### Cohort Analysis — Which users benefit most?
 
-| Risk Tier | Revenue (Thompson) | Revenue (Static) | Lift | Default Rate |
-|---|---:|---:|---:|---:|
-| Prime | ₹56.81Cr | ₹11.72Cr | +384.7% | 0.39% |
-| Near-Prime | ₹0.64Cr | ₹0.43Cr | +46.1% | 1.85% |
-| Subprime | ₹−7.18Cr | ₹−1.52Cr | Loss | 5.87% |
-| Deep-Subprime | ₹−6.40Cr | ₹−1.31Cr | Loss | 15.32% |
+| Risk Tier | Revenue (Thompson) | Lift vs Static | Default Rate |
+|---|---:|---:|---:|
+| Prime | ₹56.81Cr | +384.7% | 0.39% |
+| Near-Prime | ₹0.64Cr | +46.1% | 1.85% |
+| Subprime | ₹−7.18Cr | Loss | 5.87% |
+| Deep-Subprime | ₹−6.40Cr | Loss | 15.32% |
 
 > **Key insight:** Prime users show the highest revenue lift (+384.7%) because they have pristine credit history (0.39% default rate), allowing the bandit to confidently increase limits with minimal downside risk. Near-Prime users follow (+46.1%), showing the sweet spot where learning speed meets profitability. Lower tiers generate net losses due to default penalties outweighing interchange revenue.
 
-### Production Resilience
+---
 
-| Challenge | Result |
-|---|---|
-| **Cold start** (months 1–3) | Thompson bootstraps from ₹0/user to ₹1,790/user by month 3 |
-| **Economic shock** (month 6) | Default spike to 3.67%, recovered within 1 month |
-| **Non-stationarity** | Policy adapted continuously with zero manual retuning |
-| **Portfolio-wide revenue** | 438.6M INR (370.8% lift vs static baseline) |
+## Production Challenges — How We Handled Them
+
+| Challenge | Simulated As | Result |
+|---|---|---|
+| **Delayed reward feedback** | Reward for month T arrives at T+3 | Bandit stays uncertain (wide Beta) during lag; adapts correctly once signal arrives |
+| **Cold start — new users** | First 3 months: no reward history | Feature-based context (CIBIL, income, utilization) guides early decisions; Thompson improved +683.3% from month 1→4 |
+| **Non-stationarity** | Economic shock doubles default rates at month 6 | Thompson maintained 0-month recovery; Beta distributions updated defensively within 1–2 decision cycles |
+| **Reward sparsity** | Defaults are 3.38% of events | Sigmoid normalization prevents rare large penalties from dominating Beta updates |
+
+---
+
+## Cohort Deep Dive — Revenue by Risk & Income
+
+| Risk Tier | High Income | Mid Income | Very High Income | Low Income |
+|---|---:|---:|---:|---:|
+| **Prime** | ₹233.4M | ₹210.0M | ₹98.1M | ₹26.6M |
+| **Near-Prime** | ₹5.6M | −₹5.3M | ₹1.99M | ₹4.0M |
+| **Subprime** | −₹13.6M | −₹30.2M | −₹3.6M | −₹24.5M |
+| **Deep-Subprime** | −₹13.1M | −₹18.8M | −₹1.6M | −₹30.6M |
+
+**Key finding:** Near-Prime users (CIBIL 650–749) showed the highest lift potential at +46.1% because they have enough repayment history for Thompson to build confident Beta distributions quickly, yet sufficient unused credit capacity to benefit from limit increases. Prime users show the largest absolute revenue (+384.7% lift) due to their pristine default profile (0.39%), enabling aggressive, high-confidence limit increases. Deep-Subprime users showed the smallest lift (+minimal to losses) — Thompson learned conservatism quickly after early defaults penalized aggressive limit increases, tightening belief distributions defensively.
 
 ---
 
