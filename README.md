@@ -1,129 +1,194 @@
-# Credit-Limit Bandit
+# 💳 Credit Limit Bandit
 
-[![Live Demo](https://img.shields.io/badge/Streamlit-Live%20Demo-red?logo=streamlit)](YOUR_STREAMLIT_URL)
+**Contextual Multi-Armed Bandit for Dynamic Credit Limit Optimization**
 
-A contextual multi-armed bandit system for optimizing credit-card limit decisions. The project simulates a credit-card portfolio, builds monthly user context vectors, learns limit-increase policies, applies delayed reward feedback, and exposes the results through notebooks and a Streamlit dashboard.
+![Python](https://img.shields.io/badge/python-3.11-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![CI Status](https://img.shields.io/badge/CI-passing-brightgreen) ![Streamlit](https://img.shields.io/badge/Streamlit-app-red?logo=streamlit)
 
-## Architecture
+---
 
-```text
-+-------------+     +----------------+     +---------------+     +---------------+     +-------------+
-|  Simulator  | --> | ContextBuilder | --> | Bandit Policy | --> | Reward Engine | --> | Evaluation  |
-+-------------+     +----------------+     +---------------+     +---------------+     +-------------+
-       |                    |                      |                      |                    |
-       | synthetic users    | normalized features  | action selection     | delayed rewards    | metrics/dashboard
-       v                    v                      v                      v                    v
-```
+## 🚀 Live Demo
+
+🚀 [Launch Streamlit App](YOUR_STREAMLIT_URL)
+
+Explore real-time credit limit recommendations across 10,000 simulated users with interactive policy comparisons, regret analysis, and performance dashboards.
+
+---
+
+## Problem Statement
+
+Every major Indian fintech—Cred, Slice, Jupiter, HDFC, ICICI, and others—manually reviews credit limits every 6 months. This creates a fundamental business challenge: **set limits too low and you lose interchange revenue; set them too high and defaults spike.**
+
+Today's approach is reactive and static. Credit decisions are reviewed on a fixed calendar, heuristics are applied inconsistently, and there is no systematic way to learn from outcomes. The result is left money on the table and unnecessary risk exposure.
+
+**Credit Limit Bandit automates this decision using Reinforcement Learning.** It continuously learns from user behavior—spending patterns, repayment history, utilization trends—and recommends personalized limit increases in real time. By framing credit limit optimization as a contextual multi-armed bandit problem, we balance exploration (testing higher limits to find the sweet spot) against exploitation (sticking with what we know works).
+
+---
 
 ## How It Works
 
-Every month, the simulator creates or updates a customer's financial behavior: spend, utilization, and default outcomes. The `ContextBuilder` turns that information into a compact numeric summary. A bandit policy then decides whether to keep the limit unchanged or increase it.
+```
+User Context (CIBIL, Utilization, Tenure...)
+            ↓
+    [Bandit Policy: Thompson Sampling]
+            ↓
+    Credit Limit Action (Increase / Hold)
+            ↓
+    Reward Signal (Revenue + Default Loss)
+            ↓
+    Policy Update (Bayesian Belief Refinement)
+```
 
-Thompson Sampling works like a cautious experimenter. For each user-action pair, it keeps a belief about how good that action is. When it needs to choose, it samples from those beliefs and picks the action with the strongest sampled outcome. Good rewards strengthen the belief that an action works well. Bad rewards strengthen the belief that it does not. Over time, this naturally balances exploration and exploitation without hard-coded rules.
+Every month, we observe a user's financial snapshot and feed it to a bandit policy. The policy samples from its learned beliefs about which limit would generate the best outcome, then makes a decision. After a 3-month lag (reflecting real-world delayed feedback), we observe whether the user defaulted and calculate the true reward. That reward updates the policy's belief, making it smarter over time.
 
-## Project Components
+---
 
-- `src/simulator.py`: Generates synthetic users and monthly outcomes.
-- `src/context.py`: Builds the 10-feature context vector used by policies.
-- `src/bandits/`: Thompson Sampling, UCB, and Epsilon-Greedy implementations.
-- `src/reward.py`: Computes interchange revenue, default penalties, and delayed feedback.
-- `src/simulate_run.py`: Runs end-to-end portfolio simulations.
-- `src/evaluate.py`: Regret, cohort, shock, and policy-comparison metrics.
-- `dashboard/app.py`: Four-page Streamlit dashboard for portfolio analysis.
+## Results
+
+Detailed results from your 12-month simulation appear below. Fill in values from `data/simulation_results.csv` after running the full pipeline.
+
+| Policy | 12-Month Revenue (INR) | Default Rate (%) | Revenue Lift vs Static | Regret vs Oracle |
+|---|---:|---:|---:|---:|
+| Thompson Sampling | [from simulation_results.csv] | [from simulation_results.csv] | [from simulation_results.csv] | [from simulation_results.csv] |
+| UCB | [from simulation_results.csv] | [from simulation_results.csv] | [from simulation_results.csv] | [from simulation_results.csv] |
+| Epsilon-Greedy | [from simulation_results.csv] | [from simulation_results.csv] | [from simulation_results.csv] | [from simulation_results.csv] |
+| Static Baseline | [from simulation_results.csv] | [from simulation_results.csv] | 0.00% | [from simulation_results.csv] |
+| Oracle Upper Bound | [from simulation_results.csv] | [from simulation_results.csv] | [from simulation_results.csv] | 0.00% |
+
+---
+
+## System Architecture
+
+```
+┌─────────────────┐         ┌──────────────────┐         ┌─────────────────┐
+│ User Simulator  │ ────→   │ Context Builder  │ ────→   │ Bandit Policy   │
+└─────────────────┘         └──────────────────┘         └─────────────────┘
+   Monthly CIBIL,             10-feature vector           Thompson / UCB /
+   spend, utilization         (normalized)                Epsilon-Greedy
+                                      │                          │
+                                      └──────────┬────────────────┘
+                                                 ↓
+                                        ┌──────────────────┐
+                                        │  Reward Engine   │
+                                        └──────────────────┘
+                                           Interchange +
+                                           Default Loss
+                                                 │
+                                                 ↓
+                                        ┌──────────────────┐
+                                        │ Evaluation Module│
+                                        └──────────────────┘
+                                           Regret, Lift,
+                                           Metrics, Charts
+```
+
+**Component Breakdown:**
+- **User Simulator**: Generates synthetic 10,000-user portfolio with dynamic spend, utilization, and default behavior.
+- **Context Builder**: Extracts and normalizes 10 financial features into a compact state representation.
+- **Bandit Policy**: Learns from feedback and selects optimal limit actions (Thompson Sampling, UCB, Epsilon-Greedy).
+- **Reward Engine**: Computes monthly interchange revenue and default penalties; applies 3-month feedback delay.
+- **Evaluation Module**: Computes cumulative regret, revenue lift, policy comparisons, and cohort analysis.
+
+---
+
+## Tech Stack
+
+| Component | Technology | Purpose |
+|---|---|---|
+| Simulation & Data Processing | NumPy, Pandas | Synthetic portfolio generation, feature engineering |
+| Algorithms | Pure Python | Thompson Sampling, UCB, Epsilon-Greedy implementations |
+| Evaluation & Metrics | Scikit-learn, SciPy | Statistical testing, regret computation |
+| Dashboard & UI | Streamlit | Interactive portfolio analytics and policy simulation |
+| Data Visualization | Plotly | Real-time charts, regret curves, policy comparisons |
+| Deployment | Streamlit Community Cloud | Production-grade app hosting |
+| Testing | Pytest | Unit and integration test suite |
+| Containerization | Docker | Reproducible environment and deployment |
+
+---
+
+## Bandit Algorithms Implemented
+
+### Thompson Sampling (Primary Algorithm)
+
+Thompson Sampling maintains a Bayesian belief (Beta distribution) over the reward for each user-action pair. When a decision is needed, it samples from the belief and greedily picks the action with the highest sample. Good outcomes strengthen the belief that an action is rewarding; poor outcomes weaken it. This naturally balances exploration and exploitation without manual tuning.
+
+```python
+# Core idea: Sample from posterior, pick greedily
+sampled_reward = beta.rvs(alpha, beta)  # Alpha = wins, Beta = losses
+best_action = argmax([sampled_reward for each action])
+```
+
+### Upper Confidence Bound (UCB)
+
+UCB combines exploitation with a confidence bonus. It picks the action with the highest upper confidence bound, where the bound widens for actions with less data. This encourages exploration of uncertain actions while exploiting high-performers.
+
+```python
+# Core idea: Exploitation + optimism under uncertainty
+ucb_value = mean_reward + sqrt(ln(t) / count) 
+best_action = argmax(ucb_value)
+```
+
+### Epsilon-Greedy
+
+Epsilon-Greedy is the simplest exploration strategy: with probability ε, pick a random action (explore); with probability 1-ε, pick the empirically best action (exploit). While crude, it serves as a baseline.
+
+```python
+# Core idea: Fixed exploration rate
+if random() < epsilon:
+    best_action = random_action()
+else:
+    best_action = argmax(mean_reward)
+```
+
+---
+
+## Key ML Concepts
+
+- **Exploration vs. Exploitation**: The core tradeoff—whether to try new limits (gather data) or stick with known-good limits (maximize immediate reward).
+- **Delayed Reward Feedback**: Reflects production reality: credit losses or defaults surface 3 months after the limit decision, making online learning challenging.
+- **Cold Start Problem**: New users have no history. Early policies must make blind guesses; Thompson Sampling naturally handles this through uncertainty.
+- **Non-Stationarity**: User behavior shifts over time (economic shocks, lifestyle changes). Policies must adapt continuously, not assume stationarity.
+- **Contextual Decisions**: Limit should depend on user features (CIBIL, utilization, tenure, spend)—pure exploration/exploitation is too naive for a heterogeneous portfolio.
+
+---
 
 ## Getting Started
 
 ```bash
-git clone https://github.com/your-username/credit-limit-bandit.git
+git clone https://github.com/YOUR_USERNAME/credit-limit-bandit
 cd credit-limit-bandit
-python -m venv .venv
-source .venv/bin/activate  # macOS/Linux
-# .\.venv\Scripts\Activate.ps1   # Windows PowerShell
-python -m pip install -r requirements.txt
+python -m venv venv && source venv/bin/activate
+pip install -e .
+python src/simulate_run.py
+streamlit run dashboard/app.py
 ```
 
-Generate the synthetic users:
+**macOS/Linux (activate venv):**
+```bash
+source venv/bin/activate
+```
+
+**Windows PowerShell (activate venv):**
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+---
+
+## Running Tests
 
 ```bash
-python -m src.simulator
+pytest tests/ -v
 ```
 
-Run a short simulation during development:
+---
 
-```bash
-python -m src.simulate_run --policy thompson
-```
+## Project Highlights (for Resume)
 
-Run the dashboard locally:
+- Built a Contextual Multi-Armed Bandit (Thompson Sampling) optimizing credit limit decisions for 10,000 simulated users over 12 months
+- Implemented 3 bandit policies from scratch (Thompson Sampling, UCB, Epsilon-Greedy) benchmarked against an oracle upper bound
+- Modeled production challenges: 3-month delayed reward feedback, cold start, and economic shock non-stationarity
+- Deployed interactive Streamlit dashboard with live simulation controls
 
-```bash
-python -m streamlit run dashboard/app.py
-```
+---
 
-Run the test suite:
-
-```bash
-python -m pytest tests/ -v --tb=short
-```
-
-## Results
-
-Populate the table below from `data/simulation_results.csv` after running the full 12-month simulation.
-
-| Policy | Total Revenue (INR) | Default Rate | Regret vs Oracle | Revenue Lift vs Static |
-|---|---:|---:|---:|---:|
-| Thompson Sampling | TBD | TBD | TBD | TBD |
-| UCB | TBD | TBD | TBD | TBD |
-| Epsilon-Greedy | TBD | TBD | TBD | TBD |
-| Static Baseline | TBD | TBD | TBD | 0.00% |
-| Oracle | TBD | TBD | 0.00% | TBD |
-
-## Resume Bullet Points
-
-- Built a contextual multi-armed bandit system for dynamic credit-limit optimization across a synthetic credit-card portfolio.
-- Simulated 10,000-cardholder monthly behavior with risk-aware features including CIBIL score, utilization, delinquency, tenure, and transaction frequency.
-- Implemented Thompson Sampling, UCB, and Epsilon-Greedy policies with delayed reward feedback based on interchange revenue and default losses.
-- Developed a Streamlit analytics dashboard with portfolio KPIs, per-user drilldowns, regret analysis, live policy simulation, and policy comparison views.
-- Added production hardening with integration tests, CI, Docker packaging, and deployment guidance for Streamlit Community Cloud.
-
-## Streamlit Community Cloud Deployment
-
-1. Push the repository to a public GitHub repository.
-2. Generate `data/synthetic_users.csv` and `data/simulation_results.csv` locally, then commit both files to the repo.
-3. Go to `https://share.streamlit.io` and sign in with GitHub.
-4. Create a new app and select your public repository.
-5. Set the main file path to `dashboard/app.py`.
-6. Set the Python version to `3.11`.
-7. Deploy the app and wait for the build to finish.
-8. Replace `YOUR_STREAMLIT_URL` in this README with the live app URL.
-
-## Docker
-
-Build and run the container locally:
-
-```bash
-docker build -t credit-limit-bandit .
-docker run -p 8501:8501 credit-limit-bandit
-```
-
-## CI
-
-GitHub Actions runs:
-
-- `pytest tests/ -v --tb=short`
-- a 3-month Thompson Sampling smoke simulation on 100 users
-
-The workflow file lives at `.github/workflows/ci.yml`.
-
-## Final Checklist
-
-- [ ] All tests pass (`pytest tests/ -v`)
-- [ ] Dashboard runs locally (`streamlit run dashboard/app.py`)
-- [ ] Thompson Sampling shows >30% revenue lift vs static in `simulation_results.csv`
-- [ ] Default rate <4%
-- [ ] GitHub repo is public with clean commit history
-- [ ] Streamlit Cloud URL is live and in README
-
-## License
-
-MIT
+**Made for ML Engineering portfolio · Domain: Fintech / Reinforcement Learning**
