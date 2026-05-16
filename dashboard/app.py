@@ -18,7 +18,15 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.bandits.thompson import ThompsonSampling
 from src.context import ContextBuilder
-from src.evaluate import compute_regret, policy_comparison_table
+from src.evaluate import (
+    compute_regret,
+    policy_comparison_table,
+    compute_convergence_month,
+    compute_exploration_ratio_dict,
+    compute_cold_start_performance,
+    compute_shock_recovery,
+    build_full_metrics_table,
+)
 from src.reward import RewardBuffer
 from src.simulator import simulate_month
 
@@ -397,6 +405,47 @@ def render_portfolio_overview(results_df: pd.DataFrame, users_df: pd.DataFrame) 
     c4.metric("Convergence", f"Month {conv_month}",
               f"{conv_month}mo learning")
 
+    # Additional metrics row
+    st.markdown("")  # Spacing
+    
+    exp_dict = compute_exploration_ratio_dict(results_df, "thompson_sampling")
+    cs = compute_cold_start_performance(results_df, users_df, "thompson_sampling")
+    shock = compute_shock_recovery(results_df, "thompson_sampling")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        col1.metric(
+            "Regret vs Oracle",
+            f"{regret_pct:.1f}%",
+            delta="< 20% target" if regret_pct < 20 else "Above target",
+            delta_color="normal" if regret_pct < 20 else "inverse"
+        )
+    with col2:
+        col2.metric(
+            "Exploration rate",
+            f"{exp_dict['exploration_ratio']:.1f}%",
+            delta="10–25% healthy range"
+        )
+    with col3:
+        months = shock["months_to_recovery"] if shock["months_to_recovery"] is not None else "N/A"
+        col3.metric(
+            "Shock recovery",
+            f"{months} month{'s' if isinstance(months, int) and months != 1 else ''}" if isinstance(months, int) else "N/A",
+            delta=f"Peak default: {shock['peak_default_rate']:.1f}%" if shock["peak_default_rate"] > 0 else "No shock impact"
+        )
+    with col4:
+        if cs["cold_start_avg_reward"] != 0:
+            lift = ((cs["warm_avg_reward"] - cs["cold_start_avg_reward"]) 
+                   / abs(cs["cold_start_avg_reward"]) * 100)
+        else:
+            lift = 0
+        col4.metric(
+            "Cold start → warm",
+            f"+{lift:.0f}% reward" if lift > 0 else f"{lift:.0f}% reward",
+            delta=f"Stabilises by month {conv_month}"
+        )
+
     # Tabs
     tab_rev, tab_def, tab_act, tab_tier, tab_cohort = st.tabs(["Revenue", "Default Rate", "Actions Taken", "By Risk Tier", "Cohort Analysis"])
 
@@ -652,6 +701,54 @@ def render_user_deep_dive(results_df: pd.DataFrame, users_df: pd.DataFrame) -> N
                             "Defaulted", "Reward"]
     st.dataframe(display_cols, use_container_width=True, hide_index=True)
 
+    # Explanation section
+    with st.expander("How did the bandit make decisions for this user?"):
+        user_data = users_df[users_df["user_id"] == uid]
+        if not user_data.empty:
+            risk_tier = str(user_data["risk_tier"].values[0])
+            cibil = int(user_data["cibil_score"].values[0]) if "cibil_score" in user_data.columns else "Unknown"
+            
+            # Count actions taken
+            user_results_thompson = results_df[
+                (results_df["user_id"] == uid) & 
+                (results_df["policy"] == "thompson_sampling")
+            ]
+            action_counts = user_results_thompson["action_taken"].value_counts()
+            most_common = action_counts.index[0] if not action_counts.empty else "keep"
+            most_common_count = action_counts.iloc[0] if not action_counts.empty else 0
+            
+            tier_color = RISK_TIER_COLORS.get(risk_tier, "#4a5568")
+            
+            st.markdown(f"""
+            <div style="background:#161b2e;border:0.5px solid #1e2a45;
+                        border-radius:8px;padding:16px;font-size:13px;
+                        color:#c9d1e0;line-height:1.7">
+              <b style="color:#fff">Thompson Sampling reasoning for this user:</b><br/><br/>
+              
+              This user is in the <b style="color:{tier_color}">{escape(risk_tier)}</b> 
+              tier with a CIBIL score of <b>{cibil}</b>. 
+              Thompson Sampling started with a uniform Beta(1,1) prior — 
+              equal belief in all 4 actions. As monthly outcomes arrived 
+              (with a 3-month lag), the Beta distributions updated:
+              <br/><br/>
+              • Positive reward months → α increased for that action<br/>
+              • Default months → β increased, making the action less likely 
+                to be sampled in future<br/><br/>
+              
+              Over 12 months, the bandit took <b>"{escape(most_common)}"</b> most 
+              often ({most_common_count} times), reflecting what 
+              the Beta distributions learned was optimal for this user's 
+              risk profile.<br/><br/>
+              
+              <span style="color:#4a5568;font-size:11px">
+              Note: decisions in months 1–3 are based purely on prior 
+              beliefs (cold start). The bandit only receives its first 
+              reward signal at month 4, when the month-1 action's outcome 
+              becomes available after the 3-month feedback delay.
+              </span>
+            </div>
+            """, unsafe_allow_html=True)
+
 
 # -- PAGE 3: Policy Comparison -----------------------------------------
 def render_policy_comparison(results_df: pd.DataFrame) -> None:
@@ -741,49 +838,85 @@ def render_policy_comparison(results_df: pd.DataFrame) -> None:
         st.plotly_chart(fig_reg, use_container_width=True)
 
     with tab_summary:
-        policy_frames = {policy: frame.copy() for policy, frame in results_df.groupby("policy")}
-        comparison = policy_comparison_table(policy_frames)
-        comparison["policy"] = comparison["policy"].map(POLICY_LABELS).fillna(comparison["policy"])
-
-        # Build HTML table
-        best_rev = comparison["total_revenue_inr"].max()
-        best_lift = comparison["revenue_lift_vs_static_pct"].max()
-        best_def = comparison["default_rate_pct"].min()
-        best_regret = comparison.loc[comparison["policy"] != "Oracle", "regret_vs_oracle_pct"].min() if len(comparison) > 1 else 0
-
-        rows_html = ""
-        for _, r in comparison.iterrows():
-            is_oracle = r["policy"] == "Oracle"
-            text_color = "#4a5568" if is_oracle else "#c9d1e0"
-            def hl(val, best, fmt):
-                c = "#3b82f6" if abs(val - best) < 0.01 and not is_oracle else text_color
-                return f'<span style="color:{c};font-weight:{"600" if c=="#3b82f6" else "400"}">{fmt}</span>'
-
-            rows_html += f"""<tr style="border-bottom:0.5px solid #1e2a45">
-              <td style="padding:10px 12px;color:{text_color};font-weight:500">{r['policy']}</td>
-              <td style="padding:10px 12px">{hl(r['total_revenue_inr'], best_rev, format_inr(r['total_revenue_inr']))}</td>
-              <td style="padding:10px 12px">{hl(r['revenue_lift_vs_static_pct'], best_lift, f"{r['revenue_lift_vs_static_pct']:.1f}%")}</td>
-              <td style="padding:10px 12px">{hl(r['default_rate_pct'], best_def, f"{r['default_rate_pct']:.2f}%")}</td>
-              <td style="padding:10px 12px">{hl(r['regret_vs_oracle_pct'], best_regret, f"{r['regret_vs_oracle_pct']:.1f}%")}</td>
-              <td style="padding:10px 12px;color:{text_color}">{int(r['convergence_month'])}</td>
-              <td style="padding:10px 12px;color:{text_color}">{r['exploration_ratio_pct']:.1f}%</td>
-            </tr>"""
-
-        st.markdown(f"""
-        <div style="background:#161b2e;border:0.5px solid #1e2a45;border-radius:10px;overflow:hidden">
-          <table style="width:100%;border-collapse:collapse;font-size:12px">
-            <thead><tr style="border-bottom:1px solid #1e2a45">
-              <th style="padding:10px 12px;text-align:left;color:#4a5568;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;font-weight:500">Policy</th>
-              <th style="padding:10px 12px;text-align:left;color:#4a5568;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;font-weight:500">Revenue</th>
-              <th style="padding:10px 12px;text-align:left;color:#4a5568;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;font-weight:500">Lift vs Static</th>
-              <th style="padding:10px 12px;text-align:left;color:#4a5568;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;font-weight:500">Default Rate</th>
-              <th style="padding:10px 12px;text-align:left;color:#4a5568;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;font-weight:500">Regret vs Oracle</th>
-              <th style="padding:10px 12px;text-align:left;color:#4a5568;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;font-weight:500">Convergence</th>
-              <th style="padding:10px 12px;text-align:left;color:#4a5568;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;font-weight:500">Explore %</th>
-            </tr></thead>
-            <tbody>{rows_html}</tbody>
-          </table>
-        </div>""", unsafe_allow_html=True)
+        # Load oracle separately if not already present
+        oracle_df = results_df[results_df["policy"] == "oracle"]
+        if oracle_df.empty:
+            st.warning("Oracle data not available for full metrics table")
+            return
+        
+        # Build complete metrics table
+        metrics_df = build_full_metrics_table(results_df, users_df, oracle_df)
+        
+        # Render styled HTML table
+        def render_metrics_table(df):
+            rows_html = ""
+            policy_colors = {
+                "thompson_sampling": "#3b82f6",
+                "ucb": "#8b5cf6",
+                "epsilon_greedy": "#f59e0b",
+                "static_baseline": "#374151",
+                "oracle": "#10b981",
+            }
+            
+            for _, row in df.iterrows():
+                color = policy_colors.get(row["policy"], "#c9d1e0")
+                policy_name = row["policy"].replace("_", " ").title()
+                
+                # Format values
+                revenue = f"₹{row['total_revenue_inr']:,.0f}"
+                default_rate = f"{row['default_rate_pct']:.2f}%"
+                regret = f"{row['regret_vs_oracle_pct']:.1f}%"
+                convergence = f"{row['convergence_month']}" if isinstance(row['convergence_month'], int) else str(row['convergence_month'])
+                exploration = f"{row['exploration_pct']:.1f}%" if isinstance(row['exploration_pct'], float) else str(row['exploration_pct'])
+                
+                cells = f"""
+                <td style="padding:10px 12px">
+                  <span style="color:{color};font-weight:500">
+                    {escape(policy_name)}
+                  </span>
+                </td>
+                <td style="padding:10px 12px;text-align:right">
+                  {revenue}
+                </td>
+                <td style="padding:10px 12px;text-align:right;color:#4a5568">
+                  {default_rate}
+                </td>
+                <td style="padding:10px 12px;text-align:right">
+                  {regret}
+                </td>
+                <td style="padding:10px 12px;text-align:right">
+                  {convergence}
+                </td>
+                <td style="padding:10px 12px;text-align:right">
+                  {exploration}
+                </td>
+                """
+                rows_html += f"<tr style='border-bottom:0.5px solid #1e2a45'>{cells}</tr>"
+            
+            headers = ["Policy", "Revenue", "Default Rate", 
+                      "Regret vs Oracle", "Convergence", "Exploration"]
+            header_html = "".join(
+                f"<th style='padding:8px 12px;text-align:{"right" if i > 1 else "left"};font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:#4a5568;font-weight:500'>{h}</th>"
+                for i, h in enumerate(headers)
+            )
+            
+            st.markdown(f"""
+            <div style="overflow-x:auto;border:0.5px solid #1e2a45;
+                        border-radius:10px;margin-top:12px">
+              <table style="width:100%;border-collapse:collapse;
+                            font-size:13px;color:#c9d1e0">
+                <thead>
+                  <tr style="border-bottom:1px solid #1e2a45;
+                             background:#1a1f35">
+                    {header_html}
+                  </tr>
+                </thead>
+                <tbody>{rows_html}</tbody>
+              </table>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        render_metrics_table(metrics_df)
 
 
 # -- PAGE 4: Live Simulation ------------------------------------------
