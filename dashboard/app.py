@@ -497,7 +497,7 @@ def render_user_deep_dive(results_df: pd.DataFrame, users_df: pd.DataFrame) -> N
     sel_col, btn_col = st.columns([3, 1])
     selected_input = sel_col.text_input("User ID", value=st.session_state.selected_user_id,
                                         placeholder="e.g. USER_00042")
-    if btn_col.button("ðŸŽ² Random User"):
+    if btn_col.button("🎲 Random User"):
         st.session_state.selected_user_id = str(np.random.default_rng().choice(user_ids))
         st.rerun()
     elif selected_input in set(user_ids):
