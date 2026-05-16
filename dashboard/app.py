@@ -18,17 +18,194 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.bandits.thompson import ThompsonSampling
 from src.context import ContextBuilder
-from src.evaluate import (
-    compute_regret,
-    policy_comparison_table,
-    compute_convergence_month,
-    compute_exploration_ratio_dict,
-    compute_cold_start_performance,
-    compute_shock_recovery,
-    build_full_metrics_table,
-)
+from src import evaluate as evaluate_metrics
 from src.reward import RewardBuffer
 from src.simulator import simulate_month
+
+
+def _fallback_exploration_ratio_dict(results_df: pd.DataFrame, policy: str) -> dict:
+    if "policy" in results_df.columns:
+        policy_df = results_df.loc[results_df["policy"] == policy]
+    else:
+        policy_df = results_df
+
+    if policy_df.empty or "action_taken" not in policy_df.columns:
+        return {
+            "keep_pct": 0.0,
+            "plus_10_pct": 0.0,
+            "plus_20_pct": 0.0,
+            "plus_50_pct": 0.0,
+            "exploration_ratio": 0.0,
+        }
+
+    counts = policy_df["action_taken"].value_counts()
+    total = max(len(policy_df), 1)
+    keep_pct = float(counts.get("keep", 0) / total * 100.0)
+    plus_10_pct = float(counts.get("plus_10", 0) / total * 100.0)
+    plus_20_pct = float(counts.get("plus_20", 0) / total * 100.0)
+    plus_50_pct = float(counts.get("plus_50", 0) / total * 100.0)
+    return {
+        "keep_pct": keep_pct,
+        "plus_10_pct": plus_10_pct,
+        "plus_20_pct": plus_20_pct,
+        "plus_50_pct": plus_50_pct,
+        "exploration_ratio": 100.0 - keep_pct,
+    }
+
+
+def _fallback_cold_start_performance(
+    results_df: pd.DataFrame,
+    users_df: pd.DataFrame,
+    policy: str,
+    cold_start_months: int = 3,
+) -> dict:
+    del users_df
+    if "policy" in results_df.columns:
+        policy_df = results_df.loc[results_df["policy"] == policy]
+    else:
+        policy_df = results_df
+
+    if policy_df.empty:
+        return {
+            "cold_start_avg_reward": 0.0,
+            "warm_avg_reward": 0.0,
+            "cold_start_default_rate": 0.0,
+            "warm_default_rate": 0.0,
+            "reward_improvement_pct": 0.0,
+        }
+
+    cold_df = policy_df.loc[policy_df["month"] <= cold_start_months]
+    warm_df = policy_df.loc[policy_df["month"] > cold_start_months]
+
+    cold_reward = float(cold_df["reward_received"].mean()) if not cold_df.empty else 0.0
+    warm_reward = float(warm_df["reward_received"].mean()) if not warm_df.empty else 0.0
+    cold_default = float(cold_df["did_default"].mean() * 100.0) if not cold_df.empty else 0.0
+    warm_default = float(warm_df["did_default"].mean() * 100.0) if not warm_df.empty else 0.0
+    improvement = ((warm_reward - cold_reward) / abs(cold_reward) * 100.0) if cold_reward else 0.0
+
+    return {
+        "cold_start_avg_reward": cold_reward,
+        "warm_avg_reward": warm_reward,
+        "cold_start_default_rate": cold_default,
+        "warm_default_rate": warm_default,
+        "reward_improvement_pct": improvement,
+    }
+
+
+def _fallback_shock_recovery(results_df: pd.DataFrame, policy: str, shock_month: int = 6) -> dict:
+    if "policy" in results_df.columns:
+        policy_df = results_df.loc[results_df["policy"] == policy]
+    else:
+        policy_df = results_df
+
+    if policy_df.empty:
+        return {
+            "pre_shock_default_rate": 0.0,
+            "peak_default_rate": 0.0,
+            "peak_default_month": None,
+            "recovery_month": None,
+            "months_to_recovery": None,
+            "max_spike_pct": 0.0,
+        }
+
+    pre_df = policy_df.loc[policy_df["month"] < shock_month]
+    post_df = policy_df.loc[policy_df["month"] >= shock_month]
+    pre = float(pre_df["did_default"].mean()) if not pre_df.empty else 0.0
+
+    if post_df.empty:
+        return {
+            "pre_shock_default_rate": pre,
+            "peak_default_rate": 0.0,
+            "peak_default_month": None,
+            "recovery_month": None,
+            "months_to_recovery": None,
+            "max_spike_pct": 0.0,
+        }
+
+    by_month = post_df.groupby("month")["did_default"].mean().sort_index()
+    peak_default = float(by_month.max())
+    peak_month = int(by_month.idxmax())
+    threshold = pre * 1.10
+    recovery_month = None
+    months_to_recovery = None
+    for month, default_rate in by_month.items():
+        if default_rate <= threshold:
+            recovery_month = int(month)
+            months_to_recovery = int(month - shock_month)
+            break
+
+    max_spike_pct = float(((peak_default - pre) / max(pre, 0.001)) * 100.0)
+    return {
+        "pre_shock_default_rate": pre,
+        "peak_default_rate": peak_default,
+        "peak_default_month": peak_month,
+        "recovery_month": recovery_month,
+        "months_to_recovery": months_to_recovery,
+        "max_spike_pct": max_spike_pct,
+    }
+
+
+def _fallback_build_full_metrics_table(
+    results_df: pd.DataFrame,
+    users_df: pd.DataFrame,
+    oracle_df: pd.DataFrame = None,
+) -> pd.DataFrame:
+    del users_df
+    if oracle_df is None and "policy" in results_df.columns:
+        oracle_df = results_df.loc[results_df["policy"] == "oracle"]
+
+    oracle_total = float(oracle_df["reward_received"].sum()) if oracle_df is not None and not oracle_df.empty else 1.0
+    rows = []
+    for policy in sorted(results_df["policy"].unique()):
+        policy_df = results_df.loc[results_df["policy"] == policy]
+        total_revenue = float(policy_df["reward_received"].sum())
+        default_rate_pct = float(policy_df["did_default"].mean() * 100.0)
+        regret_vs_oracle_pct = float(((oracle_total - total_revenue) / oracle_total) * 100.0) if oracle_total else 0.0
+
+        if policy in {"oracle", "static_baseline"}:
+            convergence = "N/A"
+            exploration = "N/A"
+        else:
+            convergence = compute_convergence_month(results_df, policy)
+            exploration = compute_exploration_ratio_dict(results_df, policy).get("exploration_ratio", 0.0)
+
+        rows.append(
+            {
+                "policy": policy,
+                "total_revenue_inr": total_revenue,
+                "default_rate_pct": default_rate_pct,
+                "regret_vs_oracle_pct": regret_vs_oracle_pct,
+                "convergence_month": convergence,
+                "exploration_pct": exploration,
+            }
+        )
+
+    return pd.DataFrame(rows)
+
+
+compute_regret = evaluate_metrics.compute_regret
+policy_comparison_table = evaluate_metrics.policy_comparison_table
+compute_convergence_month = getattr(evaluate_metrics, "compute_convergence_month", lambda results_df, policy: 12)
+compute_exploration_ratio_dict = getattr(
+    evaluate_metrics,
+    "compute_exploration_ratio_dict",
+    _fallback_exploration_ratio_dict,
+)
+compute_cold_start_performance = getattr(
+    evaluate_metrics,
+    "compute_cold_start_performance",
+    _fallback_cold_start_performance,
+)
+compute_shock_recovery = getattr(
+    evaluate_metrics,
+    "compute_shock_recovery",
+    _fallback_shock_recovery,
+)
+build_full_metrics_table = getattr(
+    evaluate_metrics,
+    "build_full_metrics_table",
+    _fallback_build_full_metrics_table,
+)
 
 st.set_page_config(
     page_title="Credit Limit Bandit",
@@ -362,7 +539,7 @@ def run_live_thompson_simulation(
                                    mode="lines+markers", line=dict(color="#3b82f6", width=2),
                                    marker=dict(size=5), name="Thompson"))
         dark_chart(chart, title="Live Thompson Learning Curve", height=340)
-        chart_placeholder.plotly_chart(chart, use_container_width=True)
+        chart_placeholder.plotly_chart(chart, width="stretch")
     status_placeholder.success("âœ“ Simulation complete")
     return pd.DataFrame(logs)
 
@@ -462,7 +639,7 @@ def render_portfolio_overview(results_df: pd.DataFrame, users_df: pd.DataFrame) 
                       annotation_text="Economic shock", annotation_font_color="#ef4444",
                       annotation_font_size=10)
         dark_chart(fig, title="Cumulative Revenue by Month", height=360)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     with tab_def:
         def_df = default_rate_by_month(results_df)
@@ -478,7 +655,7 @@ def render_portfolio_overview(results_df: pd.DataFrame, users_df: pd.DataFrame) 
                        annotation_text="4% Threshold", annotation_font_color="#ef4444",
                        annotation_font_size=10)
         dark_chart(fig2, title="Default Rate by Month", height=360)
-        st.plotly_chart(fig2, use_container_width=True)
+        st.plotly_chart(fig2, width="stretch")
 
     with tab_act:
         action_monthly = (thompson_df.groupby(["month", "action_taken"]).size()
@@ -492,7 +669,7 @@ def render_portfolio_overview(results_df: pd.DataFrame, users_df: pd.DataFrame) 
                                   marker_color=ACTION_COLORS.get(action, "#888")))
         fig3.update_layout(barmode="stack")
         dark_chart(fig3, title="Thompson Sampling – Action Distribution (%)", height=360)
-        st.plotly_chart(fig3, use_container_width=True)
+        st.plotly_chart(fig3, width="stretch")
 
     with tab_tier:
         enriched = enrich_results(results_df, users_df)
@@ -530,7 +707,7 @@ def render_portfolio_overview(results_df: pd.DataFrame, users_df: pd.DataFrame) 
                                   marker_color=POLICY_COLORS.get(policy, "#888")))
         fig4.update_layout(barmode="group")
         dark_chart(fig4, title="Revenue by Risk Tier & Policy", height=360)
-        st.plotly_chart(fig4, use_container_width=True)
+        st.plotly_chart(fig4, width="stretch")
 
     with tab_cohort:
         cohort_path = PROJECT_ROOT / "data" / "cohort_results.csv"
@@ -554,7 +731,7 @@ def render_portfolio_overview(results_df: pd.DataFrame, users_df: pd.DataFrame) 
             )
             fig = dark_chart(fig, height=400)
             fig.update_coloraxes(colorbar_tickprefix="₹")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
             
             st.caption(
                 "Brighter cells = higher average reward per user. "
@@ -583,7 +760,7 @@ def render_portfolio_overview(results_df: pd.DataFrame, users_df: pd.DataFrame) 
                 st.subheader("Revenue Impact by Risk Tier", divider="blue")
                 display_cols = tier_pivot[["thompson_formatted", "static_formatted", "lift_pct"]].copy()
                 display_cols.columns = ["Thompson Revenue", "Static Revenue", "Lift (%)"]
-                st.dataframe(display_cols, use_container_width=True, hide_index=False)
+                st.dataframe(display_cols, width="stretch", hide_index=False)
         else:
             st.info("Cohort analysis data not available. Run the generation notebook first.")
 
@@ -684,7 +861,7 @@ def render_user_deep_dive(results_df: pd.DataFrame, users_df: pd.DataFrame) -> N
                 marker=dict(size=8, color=[ACTION_COLORS.get(a, "#888") for a in actions_taken["action_taken"]]),
                 name="Increase", showlegend=True))
         dark_chart(fig_limit, title="Credit Limit Trajectory", height=300)
-        st.plotly_chart(fig_limit, use_container_width=True)
+        st.plotly_chart(fig_limit, width="stretch")
 
     with right:
         colors = ["#ef4444" if d else "#10b981" for d in thompson_user["did_default"]]
@@ -692,14 +869,14 @@ def render_user_deep_dive(results_df: pd.DataFrame, users_df: pd.DataFrame) -> N
         fig_rew.add_trace(go.Bar(x=thompson_user["month"], y=thompson_user["reward_received"],
                                   marker_color=colors, name="Reward"))
         dark_chart(fig_rew, title="Monthly Reward", height=300)
-        st.plotly_chart(fig_rew, use_container_width=True)
+        st.plotly_chart(fig_rew, width="stretch")
 
     # Table
     display_cols = thompson_user[["month", "action_taken", "current_limit", "amount_spent",
                                    "did_default", "reward_received"]].copy()
     display_cols.columns = ["Month", "Action Taken", "Credit Limit", "Amount Spent",
                             "Defaulted", "Reward"]
-    st.dataframe(display_cols, use_container_width=True, hide_index=True)
+    st.dataframe(display_cols, width="stretch", hide_index=True)
 
     # Explanation section
     with st.expander("How did the bandit make decisions for this user?"):
@@ -800,7 +977,7 @@ def render_policy_comparison(results_df: pd.DataFrame) -> None:
                       annotation_text="Economic shock", annotation_font_color="#ef4444",
                       annotation_font_size=10)
         dark_chart(fig, title="Cumulative Reward â€” All Policies", height=360)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
         # Monthly delta Thompson - Static
         t_monthly = results_df[results_df["policy"] == "thompson_sampling"].groupby("month")["reward_received"].sum()
@@ -811,7 +988,7 @@ def render_policy_comparison(results_df: pd.DataFrame) -> None:
         fig_delta.add_trace(go.Bar(x=delta_df["month"], y=delta_df["delta"],
                                    marker_color=colors_delta, name="Δ Revenue"))
         dark_chart(fig_delta, title="Monthly Revenue Delta (Thompson − Static)", height=280)
-        st.plotly_chart(fig_delta, use_container_width=True)
+        st.plotly_chart(fig_delta, width="stretch")
 
     with tab_regret:
         oracle_df = results_df.loc[results_df["policy"] == "oracle"]
@@ -835,7 +1012,7 @@ def render_policy_comparison(results_df: pd.DataFrame) -> None:
                                        showarrow=True, arrowhead=2, arrowcolor="#4a5568",
                                        font=dict(size=10, color=POLICY_COLORS.get(label, "#888")))
         dark_chart(fig_reg, title="Cumulative Regret vs Oracle", height=360)
-        st.plotly_chart(fig_reg, use_container_width=True)
+        st.plotly_chart(fig_reg, width="stretch")
 
     with tab_summary:
         # Load oracle separately if not already present
@@ -956,7 +1133,7 @@ def render_live_simulation(users_df: pd.DataFrame, results_df: pd.DataFrame) -> 
             </div>""", unsafe_allow_html=True)
 
         n_months = st.select_slider("Horizon", options=[6, 9, 12], value=12)
-        run_btn = st.button("▶ Run Simulation", use_container_width=True)
+        run_btn = st.button("▶ Run Simulation", width="stretch")
 
     risk_distribution = {"Prime": prime_pct, "Near-Prime": near_prime_pct,
                          "Subprime": subprime_pct, "Deep-Subprime": max(deep_sub_pct, 0)}
@@ -1021,7 +1198,7 @@ def render_live_simulation(users_df: pd.DataFrame, results_df: pd.DataFrame) -> 
                                      mode="lines+markers", line=dict(color="#3b82f6", width=2),
                                      marker=dict(size=5), name="Thompson (Live)"))
             dark_chart(fig, title="Cumulative Revenue", height=320)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
             # Side by side: default rate + action dist
             d1, d2 = st.columns(2)
@@ -1034,7 +1211,7 @@ def render_live_simulation(users_df: pd.DataFrame, results_df: pd.DataFrame) -> 
                                            marker=dict(size=4), name="Default Rate"))
                 fig_d.add_hline(y=4.0, line_dash="dash", line_color="#4a5568", line_width=1)
                 dark_chart(fig_d, title="Default Rate by Month", height=280)
-                st.plotly_chart(fig_d, use_container_width=True)
+                st.plotly_chart(fig_d, width="stretch")
 
             with d2:
                 act_m = live_results.groupby(["month", "action_taken"]).size().reset_index(name="count")
@@ -1047,7 +1224,7 @@ def render_live_simulation(users_df: pd.DataFrame, results_df: pd.DataFrame) -> 
                                            marker_color=ACTION_COLORS.get(action, "#888")))
                 fig_a.update_layout(barmode="stack")
                 dark_chart(fig_a, title="Action Distribution (%)", height=280)
-                st.plotly_chart(fig_a, use_container_width=True)
+                st.plotly_chart(fig_a, width="stretch")
 
 
 # -- SIDEBAR & MAIN ---------------------------------------------------
