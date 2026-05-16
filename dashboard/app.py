@@ -928,7 +928,7 @@ def render_user_deep_dive(results_df: pd.DataFrame, users_df: pd.DataFrame) -> N
 
 
 # -- PAGE 3: Policy Comparison -----------------------------------------
-def render_policy_comparison(results_df: pd.DataFrame) -> None:
+def render_policy_comparison(results_df: pd.DataFrame, users_df: pd.DataFrame) -> None:
     page_header("Policy Comparison",
                 "Thompson Sampling vs UCB vs Epsilon-Greedy vs Oracle upper bound")
 
@@ -1308,7 +1308,7 @@ def main() -> None:
     elif selected_page == "Per-User Deep Dive":
         render_user_deep_dive(enrich_results(results_df, users_df), users_df)
     elif selected_page == "Policy Comparison":
-        render_policy_comparison(results_df)
+        render_policy_comparison(results_df, users_df)
     else:
         render_live_simulation(users_df, results_df)
 
