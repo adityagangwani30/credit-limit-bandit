@@ -50,24 +50,34 @@ def _monthly_rewards(frame: pd.DataFrame, reward_column: str = "reward_received"
 
 
 def compute_regret(oracle_df, policy_df) -> pd.DataFrame:
-    """Compute cumulative regret against the oracle month by month."""
-
-    oracle_monthly = _monthly_rewards(oracle_df)
-    policy_monthly = _monthly_rewards(policy_df)
-    all_months = sorted(set(oracle_monthly.index).union(set(policy_monthly.index)))
-
-    regret_df = pd.DataFrame({"month": all_months})
-    regret_df["oracle_reward"] = regret_df["month"].map(oracle_monthly).fillna(0.0)
-    regret_df["policy_reward"] = regret_df["month"].map(policy_monthly).fillna(0.0)
-    regret_df["oracle_cumulative"] = regret_df["oracle_reward"].cumsum()
-    regret_df["policy_cumulative"] = regret_df["policy_reward"].cumsum()
-    regret_df["regret"] = regret_df["oracle_cumulative"] - regret_df["policy_cumulative"]
-    regret_df["regret_pct"] = np.where(
-        regret_df["oracle_cumulative"] != 0,
-        regret_df["regret"] / regret_df["oracle_cumulative"] * 100.0,
-        0.0,
-    )
-    return regret_df[["month", "oracle_cumulative", "policy_cumulative", "regret", "regret_pct"]]
+    """
+    Compute cumulative regret against the oracle month by month.
+    
+    Regret = Oracle cumulative reward - Policy cumulative reward.
+    Both must use RAW INR rewards (not normalized).
+    
+    Returns dataframe with columns:
+        month, oracle_cumulative, policy_cumulative, 
+        regret_cumulative, regret_pct
+    
+    regret_pct = regret_cumulative / oracle_cumulative * 100
+    (only meaningful when oracle_cumulative > 0)
+    """
+    oracle_by_month = (oracle_df.groupby("month")["reward_received"]
+                       .sum().cumsum().reset_index()
+                       .rename(columns={"reward_received": "oracle_cumulative"}))
+    
+    policy_by_month = (policy_df.groupby("month")["reward_received"]
+                       .sum().cumsum().reset_index()
+                       .rename(columns={"reward_received": "policy_cumulative"}))
+    
+    merged = oracle_by_month.merge(policy_by_month, on="month")
+    merged["regret_cumulative"] = (merged["oracle_cumulative"] 
+                                    - merged["policy_cumulative"])
+    merged["regret_pct"] = (merged["regret_cumulative"] 
+                             / merged["oracle_cumulative"] * 100).clip(0, 100)
+    return merged[["month", "oracle_cumulative", "policy_cumulative", 
+                   "regret_cumulative", "regret_pct"]]
 
 
 def cohort_analysis(results_df, groupby: list[str]) -> pd.DataFrame:

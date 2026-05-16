@@ -211,32 +211,52 @@ def run_static_baseline(users_df: pd.DataFrame, n_months: int = 12) -> pd.DataFr
     )
 
 
-def run_oracle(users_df: pd.DataFrame, n_months: int = 12) -> pd.DataFrame:
-    """Build an oracle policy in hindsight from completed fixed-action runs."""
-
-    fixed_policy_runs = []
-    for action in ContextBuilder.get_action_space():
-        fixed_policy_runs.append(
-            _simulate_policy(
-                users_df=users_df,
-                n_months=n_months,
-                seed=42,
-                economic_stress_fn=None,
-                fixed_action=action,
-                policy_label=f"oracle_source_{action}",
-            )
+def run_oracle(users_df: pd.DataFrame, n_months: int = 12, seed: int = 42) -> pd.DataFrame:
+    """
+    Build an oracle policy in hindsight from completed fixed-action runs.
+    
+    Oracle policy: for each user at each month, look at what reward
+    EACH of the 4 actions would have produced (in hindsight), then
+    assign the action that produced the MAXIMUM reward.
+    """
+    all_action_results = {}
+    actions = ContextBuilder.get_action_space()
+    
+    for action in actions:
+        # Run static policy that always takes this one action
+        df = _simulate_policy(
+            users_df=users_df.copy(),
+            n_months=n_months,
+            seed=seed,
+            economic_stress_fn=None,
+            fixed_action=action,
+            policy_label=f"oracle_source_{action}",
         )
-
-    oracle_source = pd.concat(fixed_policy_runs, ignore_index=True)
-    oracle_source["reward_rank"] = oracle_source["reward_received"]
-    best_rows = (
-        oracle_source.sort_values(["month", "user_id", "reward_rank"], ascending=[True, True, False])
-        .groupby(["month", "user_id"], as_index=False)
-        .head(1)
-        .copy()
+        all_action_results[action] = df
+    
+    # Concatenate all actions
+    oracle_source = pd.concat(list(all_action_results.values()), ignore_index=True)
+    
+    # Ensure consistent data types
+    oracle_source = oracle_source.astype({
+        "month": "int64",
+        "user_id": "str",
+        "action_taken": "str",
+        "reward_received": "float64",
+    })
+    
+    # Sort by (month, user_id, reward_received) to get best reward first per group
+    oracle_source = oracle_source.sort_values(
+        by=["month", "user_id", "reward_received"],
+        ascending=[True, True, False],
+        na_position="last"
     )
-    best_rows["policy"] = "oracle"
-    return best_rows.drop(columns=["reward_rank"])
+    
+    # Get best (first) row per user-month
+    oracle_best = oracle_source.groupby(["month", "user_id"], as_index=False).first()
+    oracle_best["policy"] = "oracle"
+    
+    return oracle_best
 
 
 def _summarize_results(results_df: pd.DataFrame) -> pd.DataFrame:
