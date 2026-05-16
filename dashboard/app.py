@@ -51,10 +51,10 @@ GITHUB_URL = "https://github.com/adityagangwani30/credit-limit-bandit"
 # â”€â”€ Formatting helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def format_inr(amount):
     if amount >= 1e7:
-        return f"â‚¹{amount/1e7:.1f}Cr"
+        return f"₹{amount/1e7:.1f}Cr"
     if amount >= 1e5:
-        return f"â‚¹{amount/1e5:.1f}L"
-    return f"â‚¹{amount:,.0f}"
+        return f"₹{amount/1e5:.1f}L"
+    return f"₹{amount:,.0f}"
 
 
 def dark_chart(fig, title=None, height=320):
