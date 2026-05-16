@@ -878,7 +878,7 @@ def render_sidebar():
         st.divider()
 
         page = st.radio("Navigate",
-                        ["💼  Portfolio Overview", "ðŸ‘¤  Per-User Deep Dive",
+                        ["💼  Portfolio Overview", "👤  Per-User Deep Dive",
                          "📊  Policy Comparison", "⚡  Live Simulation"],
                         label_visibility="collapsed")
 
@@ -927,7 +927,7 @@ def main() -> None:
 
     page_map = {
         "💼  Portfolio Overview": "Portfolio Overview",
-        "ðŸ‘¤  Per-User Deep Dive": "Per-User Deep Dive",
+        "👤  Per-User Deep Dive": "Per-User Deep Dive",
         "📊  Policy Comparison": "Policy Comparison",
         "⚡  Live Simulation": "Live Simulation",
     }
