@@ -29,7 +29,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# -- Constants ----------------------------------------------------------
 POLICY_LABELS = {
     "thompson_sampling": "Thompson Sampling",
     "ucb": "UCB",
@@ -48,7 +48,7 @@ ACTION_COLORS = {"keep": "#374151", "plus_10": "#3b82f6", "plus_20": "#8b5cf6", 
 RISK_TIER_COLORS = {"Prime": "#10b981", "Near-Prime": "#3b82f6", "Subprime": "#f59e0b", "Deep-Subprime": "#ef4444"}
 GITHUB_URL = "https://github.com/adityagangwani30/credit-limit-bandit"
 
-# â”€â”€ Formatting helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# -- Formatting helpers -------------------------------------------------
 def format_inr(amount):
     if amount >= 1e7:
         return f"₹{amount/1e7:.1f}Cr"
@@ -103,7 +103,7 @@ def page_header(title, subtitle, badge_text=None, badge_color="#10b981"):
     """, unsafe_allow_html=True)
 
 
-# â”€â”€ Global CSS injection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# -- Global CSS injection ----------------------------------------------
 def inject_global_styles() -> None:
     st.markdown("""
 <style>
@@ -194,8 +194,7 @@ hr { border-color: #1e2a45 !important; }
 """, unsafe_allow_html=True)
 
 
-# â”€â”€ Data loading (unchanged logic) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-@st.cache_data
+# -- Data loading (unchanged logic) ------------------------------------
 @st.cache_data
 def load_simulation_results() -> pd.DataFrame:
     path = PROJECT_ROOT / "data" / "simulation_results.csv"
@@ -221,7 +220,7 @@ def require_data(results_df: pd.DataFrame, users_df: pd.DataFrame) -> bool:
     return True
 
 
-# â”€â”€ Data helpers (unchanged logic) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# -- Data helpers (unchanged logic) ------------------------------------
 def monthly_cumulative_rewards(results_df: pd.DataFrame) -> pd.DataFrame:
     monthly = (
         results_df.groupby(["policy_display", "month"], as_index=False)["reward_received"]
@@ -249,7 +248,7 @@ def enrich_results(results_df: pd.DataFrame, users_df: pd.DataFrame) -> pd.DataF
     return results_df.merge(users_df[available], on="user_id", how="left")
 
 
-# â”€â”€ Simulation helpers (unchanged logic) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# -- Simulation helpers (unchanged logic) ------------------------------
 def build_custom_portfolio(users_df: pd.DataFrame, risk_distribution: dict[str, int], seed: int = 42) -> pd.DataFrame:
     rng = np.random.default_rng(seed)
     total_users = len(users_df)
@@ -360,7 +359,7 @@ def run_live_thompson_simulation(
     return pd.DataFrame(logs)
 
 
-# â”€â”€ PAGE 1: Portfolio Overview â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# -- PAGE 1: Portfolio Overview -----------------------------------------
 def render_portfolio_overview(results_df: pd.DataFrame, users_df: pd.DataFrame) -> None:
     page_header("Portfolio Overview",
                 "12-month simulation · All policies vs static baseline",
@@ -485,7 +484,7 @@ def render_portfolio_overview(results_df: pd.DataFrame, users_df: pd.DataFrame) 
         st.plotly_chart(fig4, use_container_width=True)
 
 
-# â”€â”€ PAGE 2: Per-User Deep Dive â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# -- PAGE 2: Per-User Deep Dive ----------------------------------------
 def render_user_deep_dive(results_df: pd.DataFrame, users_df: pd.DataFrame) -> None:
     page_header("Per-User Deep Dive",
                 "Inspect any user's full 12-month limit trajectory and decision history")
@@ -599,7 +598,7 @@ def render_user_deep_dive(results_df: pd.DataFrame, users_df: pd.DataFrame) -> N
     st.dataframe(display_cols, use_container_width=True, hide_index=True)
 
 
-# â”€â”€ PAGE 3: Policy Comparison â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# -- PAGE 3: Policy Comparison -----------------------------------------
 def render_policy_comparison(results_df: pd.DataFrame) -> None:
     page_header("Policy Comparison",
                 "Thompson Sampling vs UCB vs Epsilon-Greedy vs Oracle upper bound")
@@ -658,8 +657,8 @@ def render_policy_comparison(results_df: pd.DataFrame) -> None:
         colors_delta = ["#10b981" if d >= 0 else "#ef4444" for d in delta_df["delta"]]
         fig_delta = go.Figure()
         fig_delta.add_trace(go.Bar(x=delta_df["month"], y=delta_df["delta"],
-                                   marker_color=colors_delta, name="Î” Revenue"))
-        dark_chart(fig_delta, title="Monthly Revenue Delta (Thompson âˆ’ Static)", height=280)
+                                   marker_color=colors_delta, name="Δ Revenue"))
+        dark_chart(fig_delta, title="Monthly Revenue Delta (Thompson − Static)", height=280)
         st.plotly_chart(fig_delta, use_container_width=True)
 
     with tab_regret:
@@ -732,7 +731,7 @@ def render_policy_comparison(results_df: pd.DataFrame) -> None:
         </div>""", unsafe_allow_html=True)
 
 
-# â”€â”€ PAGE 4: Live Simulation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# -- PAGE 4: Live Simulation ------------------------------------------
 def render_live_simulation(users_df: pd.DataFrame, results_df: pd.DataFrame) -> None:
     page_header("Live Simulation",
                 "Adjust parameters and re-run Thompson Sampling in real time")
@@ -760,7 +759,7 @@ def render_live_simulation(users_df: pd.DataFrame, results_df: pd.DataFrame) -> 
         deep_sub_pct = 100 - prime_pct - near_prime_pct - subprime_pct
 
         if deep_sub_pct < 0:
-            st.warning("âš ï¸ Distribution exceeds 100% â€” adjust sliders")
+            st.warning("⚠️ Distribution exceeds 100% – adjust sliders")
         else:
             st.markdown(f"""
             <div style="background:#161b2e;border:0.5px solid #1e2a45;border-radius:6px;
@@ -809,7 +808,7 @@ def render_live_simulation(users_df: pd.DataFrame, results_df: pd.DataFrame) -> 
             st.markdown(f"""
             <div style="background:#0d2416;border:0.5px solid #0f3d22;border-radius:8px;
                         padding:10px 16px;font-size:13px;color:#10b981;margin-bottom:12px">
-              âœ“ Simulation complete â€” Thompson Sampling: {format_inr(live_total)} total revenue
+              ✓ Simulation complete – Thompson Sampling: {format_inr(live_total)} total revenue
             </div>""", unsafe_allow_html=True)
 
             mc1, mc2, mc3 = st.columns(3)
@@ -863,7 +862,7 @@ def render_live_simulation(users_df: pd.DataFrame, results_df: pd.DataFrame) -> 
                 st.plotly_chart(fig_a, use_container_width=True)
 
 
-# â”€â”€ SIDEBAR & MAIN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# -- SIDEBAR & MAIN ---------------------------------------------------
 def render_sidebar():
     with st.sidebar:
         st.markdown("""
