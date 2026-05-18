@@ -14,6 +14,7 @@ from src.bandits.epsilon_greedy import EpsilonGreedyBandit
 from src.bandits.thompson import ThompsonSampling
 from src.bandits.ucb import UCBBandit
 from src.context import ContextBuilder
+from src.evaluate import compute_regret
 from src.reward import RewardBuffer
 from src.simulator import simulate_month
 
@@ -64,10 +65,13 @@ def _simulate_policy(
     economic_stress_fn: Callable[[int], float] | None,
     bandit=None,
     fixed_action: str | None = None,
+    fixed_action_mode: str = "repeat",
     policy_label: str | None = None,
 ) -> pd.DataFrame:
     if bandit is None and fixed_action is None:
         raise ValueError("Either bandit or fixed_action must be provided")
+    if fixed_action_mode not in {"repeat", "once_then_keep"}:
+        raise ValueError(f"Unsupported fixed_action_mode: {fixed_action_mode}")
 
     working_users = users_df.copy().reset_index(drop=True)
     context_builder = ContextBuilder(working_users)
@@ -113,7 +117,7 @@ def _simulate_policy(
             context = context_builder.build_context(user_id, histories[user_id])
 
             if fixed_action is not None:
-                action = fixed_action
+                action = fixed_action if fixed_action_mode == "repeat" or month == 1 else "keep"
             else:
                 action = bandit.select_action(context, user_id, action_space)
 
@@ -213,29 +217,50 @@ def run_static_baseline(users_df: pd.DataFrame, n_months: int = 12) -> pd.DataFr
         seed=42,
         economic_stress_fn=None,
         fixed_action="keep",
+        fixed_action_mode="repeat",
         policy_label="static_baseline",
     )
 
 
-def run_oracle(users_df: pd.DataFrame, n_months: int = 12, seed: int = 42) -> pd.DataFrame:
+def run_static_action(
+    users_df: pd.DataFrame,
+    action: str,
+    n_months: int = 12,
+    seed: int = 42,
+) -> pd.DataFrame:
+    """Run a fixed action for every user across the entire horizon."""
+
+    return _simulate_policy(
+        users_df=users_df,
+        n_months=n_months,
+        seed=seed,
+        economic_stress_fn=None,
+        fixed_action=action,
+        fixed_action_mode="once_then_keep",
+        policy_label=f"static_{action}",
+    )
+
+
+def run_theoretical_oracle(users_df: pd.DataFrame, n_months: int = 12, seed: int = 42) -> pd.DataFrame:
     """
     Build an oracle policy in hindsight from completed fixed-action runs.
     
-    Oracle policy: for each user at each month, look at what reward
-    EACH of the 4 actions would have produced (in hindsight), then
-    assign the action that produced the MAXIMUM reward.
+    Theoretical oracle: for each user at each month, look at what reward
+    each action would have produced (in hindsight), then assign the action
+    that produced the maximum reward. This is an unreachable upper bound
+    for any online policy because it uses per-month hindsight.
     """
     all_action_results = {}
     actions = ContextBuilder.get_action_space()
     
     for action in actions:
-        # Run static policy that always takes this one action
         df = _simulate_policy(
             users_df=users_df.copy(),
             n_months=n_months,
             seed=seed,
             economic_stress_fn=None,
             fixed_action=action,
+            fixed_action_mode="repeat",
             policy_label=f"oracle_source_{action}",
         )
         all_action_results[action] = df
@@ -260,9 +285,48 @@ def run_oracle(users_df: pd.DataFrame, n_months: int = 12, seed: int = 42) -> pd
     
     # Get best (first) row per user-month
     oracle_best = oracle_source.groupby(["month", "user_id"], as_index=False).first()
-    oracle_best["policy"] = "oracle"
+    oracle_best["policy"] = "oracle_theoretical"
     
     return oracle_best
+
+
+def run_practical_oracle(users_df: pd.DataFrame, n_months: int = 12, seed: int = 42) -> pd.DataFrame:
+    """
+    Practical oracle: for each user, find the single best action
+    to apply for the entire horizon.
+
+    This is a much fairer ceiling for an online policy because it does not
+    switch actions using month-by-month hindsight.
+    """
+    actions = ContextBuilder.get_action_space()
+    all_action_results: dict[str, pd.DataFrame] = {}
+    user_totals: dict[str, dict[str, float]] = {}
+
+    for action in actions:
+        df = run_static_action(users_df.copy(), action, n_months=n_months, seed=seed)
+        all_action_results[action] = df
+        grouped = df.groupby("user_id", as_index=False)["reward_received"].sum()
+        for row in grouped.itertuples(index=False):
+            if row.user_id not in user_totals:
+                user_totals[row.user_id] = {}
+            user_totals[row.user_id][action] = float(row.reward_received)
+
+    chosen_frames: list[pd.DataFrame] = []
+    for user_id, action_rewards in user_totals.items():
+        best_action = max(action_rewards, key=action_rewards.get)
+        chosen_user_path = all_action_results[best_action].loc[
+            all_action_results[best_action]["user_id"] == user_id
+        ].copy()
+        chosen_user_path["policy"] = "oracle_practical"
+        chosen_frames.append(chosen_user_path)
+
+    return pd.concat(chosen_frames, ignore_index=True)
+
+
+def run_oracle(users_df: pd.DataFrame, n_months: int = 12, seed: int = 42) -> pd.DataFrame:
+    """Backward-compatible alias for the theoretical oracle."""
+
+    return run_theoretical_oracle(users_df, n_months=n_months, seed=seed)
 
 
 def _summarize_results(results_df: pd.DataFrame) -> pd.DataFrame:
@@ -297,6 +361,8 @@ def main() -> None:
             "static",
             "static_baseline",
             "oracle",
+            "oracle_theoretical",
+            "oracle_practical",
         ],
         help="Run one policy or all policies.",
     )
@@ -315,17 +381,26 @@ def main() -> None:
 
     start_time = time.perf_counter()
     all_results: list[pd.DataFrame] = []
+    thompson_df = None
 
     if args.policy in {"all", "thompson", "thompson_sampling"}:
-        all_results.append(run_simulation(ThompsonSampling(), users_df, n_months=args.n_months, seed=42))
+        thompson_df = run_simulation(ThompsonSampling(), users_df, n_months=args.n_months, seed=42)
+        all_results.append(thompson_df)
     if args.policy in {"all", "ucb"}:
         all_results.append(run_simulation(UCBBandit(), users_df, n_months=args.n_months, seed=42))
     if args.policy in {"all", "epsilon_greedy"}:
         all_results.append(run_simulation(EpsilonGreedyBandit(), users_df, n_months=args.n_months, seed=42))
     if args.policy in {"all", "static", "static_baseline"}:
         all_results.append(run_static_baseline(users_df, n_months=args.n_months))
-    if args.policy in {"all", "oracle"}:
-        all_results.append(run_oracle(users_df, n_months=args.n_months))
+    theoretical_oracle_df = None
+    practical_oracle_df = None
+
+    if args.policy in {"all", "oracle", "oracle_theoretical"}:
+        theoretical_oracle_df = run_theoretical_oracle(users_df, n_months=args.n_months)
+        all_results.append(theoretical_oracle_df)
+    if args.policy in {"all", "oracle_practical"}:
+        practical_oracle_df = run_practical_oracle(users_df, n_months=args.n_months)
+        all_results.append(practical_oracle_df)
 
     combined_results = pd.concat(all_results, ignore_index=True)
     output_path = Path(__file__).resolve().parents[1] / "data" / "simulation_results.csv"
@@ -341,6 +416,18 @@ def main() -> None:
             f"  {row.policy}: total_reward={row.total_reward:.2f}, "
             f"default_rate={row.default_rate * 100:.2f}%"
         )
+
+    if thompson_df is not None:
+        if theoretical_oracle_df is None:
+            theoretical_oracle_df = run_theoretical_oracle(users_df, n_months=args.n_months)
+        if practical_oracle_df is None:
+            practical_oracle_df = run_practical_oracle(users_df, n_months=args.n_months)
+
+        theoretical_regret = compute_regret(theoretical_oracle_df, thompson_df)
+        practical_regret = compute_regret(practical_oracle_df, thompson_df)
+        print(f"Regret vs Theoretical Oracle: {theoretical_regret['regret_pct']:.1f}%")
+        print(f"Regret vs Practical Oracle:   {practical_regret['regret_pct']:.1f}%")
+
     print(f"Runtime: {runtime_seconds:.2f} seconds")
 
 

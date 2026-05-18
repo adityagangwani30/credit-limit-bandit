@@ -48,20 +48,18 @@ Every month, we observe a user's financial snapshot and feed it to a bandit poli
 
 ### Policy Comparison (12-month simulation, 10,000 users)
 
-| Policy | Revenue (INR) | Lift vs Static | Regret % | Default Rate | Convergence | Exploration |
+| Policy | Revenue (INR) | Lift vs Static | Regret vs Practical Oracle | Default Rate | Convergence | Exploration |
 |---|---:|---:|---:|---:|---:|---:|
-| Thompson Sampling | ₹43.86Cr | +370.6% | 93.77% | 3.38% | Month 12 | 75.35% |
-| UCB | ₹23.96Cr | +157.1% | 96.60% | 3.38% | Month 12 | 75.0% |
-| Epsilon-Greedy | ₹9.21Cr | −1.2% | 98.69% | 3.38% | Month 7 | 11.63% |
-| Static Baseline | ₹9.32Cr | 0% | 98.68% | 3.38% | N/A | 0% |
-| Oracle Upper Bound | ₹703.92Cr | +7451% | 0% | 3.38% | N/A | N/A |
+| Thompson Sampling | ₹9.20Cr | −3.79% | 42.19% | 3.38% | Month 5 | 75.29% |
+| UCB | ₹8.56Cr | −10.47% | 46.20% | 3.38% | Month 7 | 82.12% |
+| Epsilon-Greedy | ₹9.41Cr | −1.56% | 40.85% | 3.38% | Month 4 | 8.17% |
+| Static Baseline | ₹9.56Cr | 0% | 39.91% | 3.38% | N/A | 0% |
+| Practical Oracle | ₹15.91Cr | +66.42% | 0% | 3.38% | N/A | N/A |
+| Theoretical Oracle (Reference) | ₹33.40Cr | +249.37% | N/A | 3.38% | N/A | N/A |
 
-> **Thompson Sampling met 3 of 4 targets from the project spec:**
-> - Revenue lift >30% ✓ (achieved 370.6%)
-> - Default rate <4% ✓ (achieved 3.38%)
-> - Exploration rate 10-25% ✗ (achieved 75.35% — too aggressive)
-> - Convergence by month 5 ✓ (policy stabilized by month 12)
+> Regret is measured against a **practical oracle** — a policy that knew the single best static action per user for the full 12-month horizon. The theoretical per-month hindsight oracle (₹33.40Cr) is included for completeness but is not a meaningful comparison target for any online policy.
 
+> In the current simulator, Thompson Sampling's regret drops from **72.46% vs the theoretical oracle** to **42.19% vs the practical oracle**, which is a materially fairer benchmark even though it remains a challenging ceiling.
 ### Cohort Analysis — Which users benefit most?
 
 | Risk Tier | Revenue (Thompson) | Lift vs Static | Default Rate |

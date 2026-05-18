@@ -49,7 +49,38 @@ def _monthly_rewards(frame: pd.DataFrame, reward_column: str = "reward_received"
     return frame.groupby("month")[reward_column].sum().sort_index()
 
 
-def compute_regret(oracle_df, policy_df) -> pd.DataFrame:
+def _total_reward(frame: pd.DataFrame) -> float:
+    reward_column = "reward_received" if "reward_received" in frame.columns else "reward"
+    return float(frame[reward_column].sum())
+
+
+def compute_regret(oracle_df, policy_df, label: str = "policy") -> dict:
+    """
+    Compute total regret against a chosen oracle.
+
+    Returns:
+        {
+            "label": str,
+            "oracle_total": float,
+            "policy_total": float,
+            "regret": float,
+            "regret_pct": float,
+        }
+    """
+    oracle_total = _total_reward(oracle_df)
+    policy_total = _total_reward(policy_df)
+    regret = oracle_total - policy_total
+    regret_pct = (regret / oracle_total * 100.0) if oracle_total > 0 else 0.0
+    return {
+        "label": label,
+        "oracle_total": oracle_total,
+        "policy_total": policy_total,
+        "regret": regret,
+        "regret_pct": round(regret_pct, 2),
+    }
+
+
+def compute_cumulative_regret(oracle_df, policy_df) -> pd.DataFrame:
     """
     Compute cumulative regret against the oracle month by month.
     
@@ -63,13 +94,19 @@ def compute_regret(oracle_df, policy_df) -> pd.DataFrame:
     regret_pct = regret_cumulative / oracle_cumulative * 100
     (only meaningful when oracle_cumulative > 0)
     """
-    oracle_by_month = (oracle_df.groupby("month")["reward_received"]
+    if "month" not in oracle_df.columns or "month" not in policy_df.columns:
+        raise ValueError("Cumulative regret requires month-level results with a 'month' column")
+
+    reward_column_oracle = "reward_received" if "reward_received" in oracle_df.columns else "reward"
+    reward_column_policy = "reward_received" if "reward_received" in policy_df.columns else "reward"
+
+    oracle_by_month = (oracle_df.groupby("month")[reward_column_oracle]
                        .sum().cumsum().reset_index()
-                       .rename(columns={"reward_received": "oracle_cumulative"}))
+                       .rename(columns={reward_column_oracle: "oracle_cumulative"}))
     
-    policy_by_month = (policy_df.groupby("month")["reward_received"]
+    policy_by_month = (policy_df.groupby("month")[reward_column_policy]
                        .sum().cumsum().reset_index()
-                       .rename(columns={"reward_received": "policy_cumulative"}))
+                       .rename(columns={reward_column_policy: "policy_cumulative"}))
     
     merged = oracle_by_month.merge(policy_by_month, on="month")
     merged["regret_cumulative"] = (merged["oracle_cumulative"] 
@@ -168,12 +205,15 @@ def _convergence_month(results_df: pd.DataFrame) -> int:
 def policy_comparison_table(all_results: dict[str, pd.DataFrame]) -> pd.DataFrame:
     """Create a cross-policy comparison table."""
 
-    if "oracle" not in all_results:
-        raise ValueError("all_results must include an 'oracle' entry")
+    oracle_key = "oracle_practical" if "oracle_practical" in all_results else "oracle"
+    if oracle_key not in all_results and "oracle_theoretical" in all_results:
+        oracle_key = "oracle_theoretical"
+    if oracle_key not in all_results:
+        raise ValueError("all_results must include an oracle entry")
     if "static_baseline" not in all_results:
         raise ValueError("all_results must include a 'static_baseline' entry")
 
-    oracle_total_reward = float(all_results["oracle"]["reward_received"].sum())
+    oracle_total_reward = _total_reward(all_results[oracle_key])
     static_total_reward = float(all_results["static_baseline"]["reward_received"].sum())
 
     rows: list[dict] = []
@@ -468,12 +508,16 @@ def build_full_metrics_table(
         DataFrame with one row per policy
     """
     if oracle_df is None:
-        oracle_df = results_df[results_df["policy"] == "oracle"]
+        oracle_df = results_df[results_df["policy"] == "oracle_practical"]
+        if oracle_df.empty:
+            oracle_df = results_df[results_df["policy"] == "oracle"]
+        if oracle_df.empty:
+            oracle_df = results_df[results_df["policy"] == "oracle_theoretical"]
     
     if oracle_df.empty:
         raise ValueError("No oracle results found")
     
-    oracle_total_reward = float(oracle_df["reward_received"].sum())
+    oracle_total_reward = _total_reward(oracle_df)
     oracle_total_reward = oracle_total_reward if oracle_total_reward != 0 else 1.0
     
     # Get unique policies
@@ -489,9 +533,11 @@ def build_full_metrics_table(
         total_revenue_inr = float(policy_df["reward_received"].sum())
         default_rate_pct = float(policy_df["did_default"].mean() * 100.0)
         regret_vs_oracle_pct = float(((oracle_total_reward - total_revenue_inr) / oracle_total_reward) * 100.0)
+        if policy == "oracle_theoretical":
+            regret_vs_oracle_pct = np.nan
         
         # Bandit-specific metrics (skip for static_baseline and oracle)
-        if policy in ["oracle", "static_baseline"]:
+        if policy in ["oracle", "oracle_theoretical", "oracle_practical", "static_baseline"]:
             convergence_month = "N/A"
             exploration_pct = "N/A"
         else:
@@ -523,7 +569,11 @@ def build_full_metrics_table(
 if __name__ == "__main__":
     df = pd.read_csv("data/simulation_results.csv")
     users_df = pd.read_csv("data/synthetic_users.csv")
-    oracle_df = df[df["policy"] == "oracle"]
+    oracle_df = df[df["policy"] == "oracle_practical"]
+    if oracle_df.empty:
+        oracle_df = df[df["policy"] == "oracle"]
+    if oracle_df.empty:
+        oracle_df = df[df["policy"] == "oracle_theoretical"]
     
     print("=" * 70)
     print("FULL METRICS REPORT")

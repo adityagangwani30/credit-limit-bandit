@@ -152,7 +152,11 @@ def _fallback_build_full_metrics_table(
 ) -> pd.DataFrame:
     del users_df
     if oracle_df is None and "policy" in results_df.columns:
-        oracle_df = results_df.loc[results_df["policy"] == "oracle"]
+        oracle_df = results_df.loc[results_df["policy"] == "oracle_practical"]
+        if oracle_df.empty:
+            oracle_df = results_df.loc[results_df["policy"] == "oracle"]
+        if oracle_df.empty:
+            oracle_df = results_df.loc[results_df["policy"] == "oracle_theoretical"]
 
     oracle_total = float(oracle_df["reward_received"].sum()) if oracle_df is not None and not oracle_df.empty else 1.0
     rows = []
@@ -161,8 +165,10 @@ def _fallback_build_full_metrics_table(
         total_revenue = float(policy_df["reward_received"].sum())
         default_rate_pct = float(policy_df["did_default"].mean() * 100.0)
         regret_vs_oracle_pct = float(((oracle_total - total_revenue) / oracle_total) * 100.0) if oracle_total else 0.0
+        if policy == "oracle_theoretical":
+            regret_vs_oracle_pct = float("nan")
 
-        if policy in {"oracle", "static_baseline"}:
+        if policy in {"oracle", "oracle_theoretical", "oracle_practical", "static_baseline"}:
             convergence = "N/A"
             exploration = "N/A"
         else:
@@ -184,6 +190,7 @@ def _fallback_build_full_metrics_table(
 
 
 compute_regret = evaluate_metrics.compute_regret
+compute_cumulative_regret = getattr(evaluate_metrics, "compute_cumulative_regret", None)
 policy_comparison_table = evaluate_metrics.policy_comparison_table
 compute_convergence_month = getattr(evaluate_metrics, "compute_convergence_month", lambda results_df, policy: 12)
 compute_exploration_ratio_dict = getattr(
@@ -1028,14 +1035,18 @@ def render_policy_comparison(results_df: pd.DataFrame, users_df: pd.DataFrame) -
         st.plotly_chart(fig_delta, width="stretch")
 
     with tab_regret:
-        oracle_df = results_df.loc[results_df["policy"] == "oracle"]
+        oracle_df = results_df.loc[results_df["policy"] == "oracle_practical"]
+        if oracle_df.empty:
+            oracle_df = results_df.loc[results_df["policy"] == "oracle_theoretical"]
         fig_reg = go.Figure()
         for policy_key, label in [("thompson_sampling", "Thompson Sampling"),
                                    ("ucb", "UCB"), ("epsilon_greedy", "Epsilon-Greedy")]:
             policy_df = results_df.loc[results_df["policy"] == policy_key]
             if policy_df.empty:
                 continue
-            regret_df = compute_regret(oracle_df, policy_df)
+            if compute_cumulative_regret is None:
+                continue
+            regret_df = compute_cumulative_regret(oracle_df, policy_df)
             regret_col = "regret_cumulative" if "regret_cumulative" in regret_df.columns else "regret"
             if regret_col not in regret_df.columns:
                 continue
@@ -1073,6 +1084,8 @@ def render_policy_comparison(results_df: pd.DataFrame, users_df: pd.DataFrame) -
                 "epsilon_greedy": "#f59e0b",
                 "static_baseline": "#374151",
                 "oracle": "#10b981",
+                "oracle_practical": "#10b981",
+                "oracle_theoretical": "#14b8a6",
             }
             
             for _, row in df.iterrows():
@@ -1082,7 +1095,8 @@ def render_policy_comparison(results_df: pd.DataFrame, users_df: pd.DataFrame) -
                 # Format values
                 revenue = f"₹{row['total_revenue_inr']:,.0f}"
                 default_rate = f"{row['default_rate_pct']:.2f}%"
-                regret = f"{row['regret_vs_oracle_pct']:.1f}%"
+                regret_value = row["regret_vs_oracle_pct"]
+                regret = "N/A" if pd.isna(regret_value) else f"{regret_value:.1f}%"
                 convergence = f"{row['convergence_month']}" if isinstance(row['convergence_month'], int) else str(row['convergence_month'])
                 exploration = f"{row['exploration_pct']:.1f}%" if isinstance(row['exploration_pct'], float) else str(row['exploration_pct'])
                 

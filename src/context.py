@@ -97,7 +97,8 @@ class ContextBuilder:
             raise ValueError(f"Unsupported action: {action}")
         if not np.isfinite(current_limit) or current_limit <= 0:
             raise ValueError("current_limit must be a positive finite number")
-        return round(float(current_limit) * ACTION_MULTIPLIERS[action], 2)
+        updated_limit = float(current_limit) * ACTION_MULTIPLIERS[action]
+        return round(min(updated_limit, MAX_CREDIT_LIMIT), 2)
 
     def _resolve_current_limit(self, user: pd.Series, month_history: list[dict]) -> float:
         if not month_history:
