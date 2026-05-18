@@ -2,7 +2,7 @@
 
 **Contextual Multi-Armed Bandit for Dynamic Credit Limit Optimization**
 
-![Python](https://img.shields.io/badge/python-3.11-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![CI](https://github.com/YOUR_USERNAME/credit-limit-bandit/actions/workflows/ci.yml/badge.svg) ![Tests](https://img.shields.io/badge/tests-17%20passing-brightgreen) ![Streamlit](https://img.shields.io/badge/Streamlit-app-red?logo=streamlit)
+![Python](https://img.shields.io/badge/python-3.11-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![CI](https://github.com/adityagangwani30/credit-limit-bandit/actions/workflows/ci.yml/badge.svg) ![Tests](https://img.shields.io/badge/tests-17%20passing-brightgreen) ![Streamlit](https://img.shields.io/badge/Streamlit-app-red?logo=streamlit)
 
 ---
 
