@@ -349,3 +349,29 @@ def simulate_month(
             "outstanding_amount": np.round(outstanding_amount, 2),
         }
     )
+
+
+if __name__ == "__main__":
+    """Generate and save synthetic users portfolio."""
+    print("Generating 10,000 users with seed=42...")
+    users_df = generate_users(n=10_000, seed=42)
+    
+    users_df.to_csv("data/synthetic_users.csv", index=False)
+    print("✓ Saved to data/synthetic_users.csv")
+    
+    print("\nValidation:")
+    print(f"  Total users:      {len(users_df):,}")
+    
+    tier_dist = users_df["risk_tier"].value_counts()
+    for tier in RISK_TIER_ORDER:
+        count = tier_dist.get(tier, 0)
+        pct = (count / len(users_df)) * 100
+        print(f"  {tier:15s}: {count:5,} ({pct:5.1f}%)")
+    
+    default_rate = (users_df["delinquency_count"] > 0).mean() * 100
+    print(f"  Aggregate default indicator rate: {default_rate:.2f}%")
+    
+    print("\n  Mean CIBIL by tier:")
+    for tier in RISK_TIER_ORDER:
+        mean_cibil = users_df[users_df["risk_tier"] == tier]["cibil_score"].mean()
+        print(f"    {tier:15s}: ~{mean_cibil:.0f}")
