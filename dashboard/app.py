@@ -230,6 +230,7 @@ POLICY_COLORS = {
     "Oracle": "#10b981",
 }
 ACTION_COLORS = {"keep": "#374151", "plus_10": "#3b82f6", "plus_20": "#8b5cf6", "plus_50": "#10b981"}
+ACTION_LABELS = {"keep": "Keep", "plus_10": "+10%", "plus_20": "+20%", "plus_50": "+50%"}
 RISK_TIER_COLORS = {"Prime": "#10b981", "Near-Prime": "#3b82f6", "Subprime": "#f59e0b", "Deep-Subprime": "#ef4444"}
 GITHUB_URL = "https://github.com/adityagangwani30/credit-limit-bandit"
 
@@ -243,28 +244,30 @@ def format_inr(amount):
 
 
 def dark_chart(fig, title=None, height=320):
+    existing_title = fig.layout.title.text if fig.layout.title and fig.layout.title.text else None
+    effective_title = title if title is not None else existing_title
     fig.update_layout(
         template="plotly_dark",
         paper_bgcolor="#161b2e",
         plot_bgcolor="#161b2e",
         font=dict(family="Inter, system-ui", color="#c9d1e0", size=11),
         title=dict(
-            text=title,
+            text=effective_title,
             font=dict(size=13, color="#ffffff"),
             x=0, xanchor="left",
             pad=dict(l=4, b=12),
-        ) if title else None,
-        margin=dict(l=8, r=8, t=36 if title else 12, b=8),
+        ) if effective_title else None,
+        margin=dict(l=8, r=8, t=36 if effective_title else 12, b=8),
         height=height,
         legend=dict(
             bgcolor="rgba(0,0,0,0)", bordercolor="#1e2a45", borderwidth=0.5,
             font=dict(size=10), orientation="h",
-            yanchor="bottom", y=1.02, xanchor="left", x=0,
+            yanchor="bottom", y=1.0, xanchor="left", x=0,
         ),
         xaxis=dict(gridcolor="#1e2a45", linecolor="#1e2a45", tickcolor="#1e2a45",
-                   tickfont=dict(size=10, color="#4a5568"), zeroline=False),
+                   tickfont=dict(size=10, color="#93a1b9"), zeroline=False),
         yaxis=dict(gridcolor="#1e2a45", linecolor="#1e2a45", tickcolor="#1e2a45",
-                   tickfont=dict(size=10, color="#4a5568"), zeroline=False),
+                   tickfont=dict(size=10, color="#93a1b9"), zeroline=False),
         hoverlabel=dict(bgcolor="#1a1f35", bordercolor="#2a3050",
                         font=dict(size=11, color="#ffffff")),
     )
@@ -278,12 +281,12 @@ def page_header(title, subtitle, badge_text=None, badge_color="#10b981"):
             border-radius:10px;padding:3px 10px;font-size:10px;color:{badge_color};
             font-weight:500;margin-left:10px">{badge_text}</span>"""
     st.markdown(f"""
-    <div style="padding:8px 0 20px;border-bottom:1px solid #1e2a45;margin-bottom:20px">
-      <div style="display:flex;align-items:center">
-        <span style="font-size:20px;font-weight:600;color:#ffffff;letter-spacing:-0.02em">{title}</span>
+    <div style="padding:8px 0 18px;border-bottom:1px solid #1e2a45;margin-bottom:22px">
+      <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px">
+        <span style="font-size:22px;font-weight:600;color:#ffffff;letter-spacing:-0.02em">{title}</span>
         {badge_html}
       </div>
-      <div style="font-size:12px;color:#4a5568;margin-top:4px">{subtitle}</div>
+      <div style="font-size:12px;color:#8f9bb1;margin-top:6px">{subtitle}</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -300,14 +303,18 @@ html, body, [class*="css"], .stApp {
 }
 #MainMenu, footer, header { visibility: hidden; }
 .stDeployButton { display: none; }
+div.block-container {
+    padding-top: 1rem !important;
+    padding-bottom: 1rem !important;
+}
 section[data-testid="stSidebar"] {
     background-color: #0f1117 !important;
     border-right: 1px solid #1e2a45 !important;
-    min-width: 240px !important; max-width: 240px !important;
+    min-width: 250px !important; max-width: 250px !important;
 }
 section[data-testid="stSidebar"] .stRadio label {
-    color: #8892a4 !important; font-size: 13px !important;
-    padding: 6px 8px !important; border-radius: 6px !important;
+    color: #c9d1e0 !important; font-size: 13px !important;
+    padding: 8px 10px !important; border-radius: 6px !important;
     display: block; transition: all 0.15s;
 }
 section[data-testid="stSidebar"] .stRadio label:hover {
@@ -315,12 +322,12 @@ section[data-testid="stSidebar"] .stRadio label:hover {
 }
 [data-testid="stMetric"] {
     background-color: #161b2e !important; border: 0.5px solid #1e2a45 !important;
-    border-radius: 10px !important; padding: 16px 18px !important;
+    border-radius: 10px !important; padding: 18px 20px !important;
 }
 [data-testid="stMetricLabel"] {
-    font-size: 10px !important; text-transform: uppercase !important;
-    letter-spacing: 0.06em !important; color: #4a5568 !important; font-weight: 500 !important;
-    white-space: normal !important; word-wrap: break-word !important; line-height: 1.2 !important;
+    font-size: 11px !important; text-transform: uppercase !important;
+    letter-spacing: 0.06em !important; color: #8f9bb1 !important; font-weight: 500 !important;
+    white-space: normal !important; word-wrap: break-word !important; line-height: 1.3 !important;
 }
 [data-testid="stMetricValue"] {
     font-size: 22px !important; font-weight: 600 !important;
@@ -335,7 +342,7 @@ section[data-testid="stSidebar"] .stRadio label:hover {
 }
 .dataframe { color: #c9d1e0 !important; }
 .dataframe th {
-    background: #1a1f35 !important; color: #4a5568 !important;
+    background: #1a1f35 !important; color: #9aa8bf !important;
     font-size: 10px !important; text-transform: uppercase !important;
     letter-spacing: 0.05em !important; border-bottom: 1px solid #1e2a45 !important;
 }
@@ -364,10 +371,11 @@ section[data-testid="stSidebar"] .stRadio label:hover {
     background: transparent !important; border-bottom: 1px solid #1e2a45 !important; gap: 0 !important;
 }
 .stTabs [data-baseweb="tab"] {
-    background: transparent !important; color: #4a5568 !important;
-    font-size: 12px !important; font-weight: 500 !important;
-    padding: 8px 16px !important; border-bottom: 2px solid transparent !important;
+    background: transparent !important; color: #9aa8bf !important;
+    font-size: 13px !important; font-weight: 500 !important;
+    padding: 10px 20px !important; border-bottom: 2px solid transparent !important;
 }
+.stTabs [data-baseweb="tab"]:hover { color: #c9d1e0 !important; }
 .stTabs [aria-selected="true"] { color: #3b82f6 !important; border-bottom-color: #3b82f6 !important; }
 .stProgress > div > div { background: #3b82f6 !important; }
 .streamlit-expanderHeader {
@@ -375,6 +383,27 @@ section[data-testid="stSidebar"] .stRadio label:hover {
     border-radius: 8px !important; color: #c9d1e0 !important; font-size: 13px !important;
 }
 hr { border-color: #1e2a45 !important; }
+@media (max-width: 1024px) {
+    section[data-testid="stSidebar"] {
+        min-width: 100% !important;
+        max-width: 100% !important;
+    }
+}
+@media (max-width: 768px) {
+    [data-testid="column"] {
+        min-width: 100% !important;
+    }
+    div.block-container {
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+    }
+    [data-testid="stMetric"] {
+        padding: 12px 14px !important;
+    }
+    [data-testid="stMetricValue"] {
+        font-size: 18px !important;
+    }
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -540,7 +569,7 @@ def run_live_thompson_simulation(
                                    marker=dict(size=5), name="Thompson"))
         dark_chart(chart, title="Live Thompson Learning Curve", height=340)
         chart_placeholder.plotly_chart(chart, width="stretch")
-    status_placeholder.success("âœ“ Simulation complete")
+    status_placeholder.success("Simulation complete")
     return pd.DataFrame(logs)
 
 
@@ -582,9 +611,6 @@ def render_portfolio_overview(results_df: pd.DataFrame, users_df: pd.DataFrame) 
     c4.metric("Convergence", f"Month {conv_month}",
               f"{conv_month}mo learning")
 
-    # Additional metrics row
-    st.markdown("")  # Spacing
-    
     exp_dict = compute_exploration_ratio_dict(results_df, "thompson_sampling")
     cs = compute_cold_start_performance(results_df, users_df, "thompson_sampling")
     shock = compute_shock_recovery(results_df, "thompson_sampling")
@@ -602,7 +628,8 @@ def render_portfolio_overview(results_df: pd.DataFrame, users_df: pd.DataFrame) 
         col2.metric(
             "Exploration rate",
             f"{exp_dict['exploration_ratio']:.1f}%",
-            delta="10–25% healthy range"
+            delta=f"{'In' if 10 <= exp_dict['exploration_ratio'] <= 25 else 'Outside'} healthy range (10-25%)",
+            delta_color="normal" if 10 <= exp_dict['exploration_ratio'] <= 25 else "inverse"
         )
     with col3:
         months = shock["months_to_recovery"] if shock["months_to_recovery"] is not None else "N/A"
@@ -618,7 +645,7 @@ def render_portfolio_overview(results_df: pd.DataFrame, users_df: pd.DataFrame) 
         else:
             lift = 0
         col4.metric(
-            "Cold start → warm",
+            "Cold start to warm",
             f"+{lift:.0f}% reward" if lift > 0 else f"{lift:.0f}% reward",
             delta=f"Stabilises by month {conv_month}"
         )
@@ -634,7 +661,8 @@ def render_portfolio_overview(results_df: pd.DataFrame, users_df: pd.DataFrame) 
             fig.add_trace(go.Scatter(x=pdf["month"], y=pdf["cumulative_reward"],
                                      mode="lines+markers", name=policy,
                                      line=dict(color=POLICY_COLORS.get(policy, "#888"), width=2),
-                                     marker=dict(size=4)))
+                                     marker=dict(size=4),
+                                     hovertemplate="Month %{x}<br>₹%{y:,.0f}<extra>%{fullData.name}</extra>"))
         fig.add_vline(x=6, line_dash="dash", line_color="#ef4444", line_width=1,
                       annotation_text="Economic shock", annotation_font_color="#ef4444",
                       annotation_font_size=10)
@@ -650,7 +678,8 @@ def render_portfolio_overview(results_df: pd.DataFrame, users_df: pd.DataFrame) 
             fig2.add_trace(go.Scatter(x=pdf["month"], y=pdf["default_pct"],
                                       mode="lines+markers", name=policy,
                                       line=dict(color=POLICY_COLORS.get(policy, "#888"), width=2),
-                                      marker=dict(size=4)))
+                                      marker=dict(size=4),
+                                      hovertemplate="Month %{x}<br>%{y:.2f}%<extra>%{fullData.name}</extra>"))
         fig2.add_hline(y=4.0, line_dash="dash", line_color="#ef4444", line_width=1,
                        annotation_text="4% Threshold", annotation_font_color="#ef4444",
                        annotation_font_size=10)
@@ -665,10 +694,10 @@ def render_portfolio_overview(results_df: pd.DataFrame, users_df: pd.DataFrame) 
         fig3 = go.Figure()
         for action in ["keep", "plus_10", "plus_20", "plus_50"]:
             adf = action_monthly[action_monthly["action_taken"] == action]
-            fig3.add_trace(go.Bar(x=adf["month"], y=adf["pct"], name=action,
+            fig3.add_trace(go.Bar(x=adf["month"], y=adf["pct"], name=ACTION_LABELS.get(action, action),
                                   marker_color=ACTION_COLORS.get(action, "#888")))
         fig3.update_layout(barmode="stack")
-        dark_chart(fig3, title="Thompson Sampling – Action Distribution (%)", height=360)
+        dark_chart(fig3, title="Thompson Sampling - Action Distribution (%)", height=360)
         st.plotly_chart(fig3, width="stretch")
 
     with tab_tier:
@@ -687,7 +716,7 @@ def render_portfolio_overview(results_df: pd.DataFrame, users_df: pd.DataFrame) 
               <div style="font-size:13px;font-weight:600;color:{color}">{tier}</div>
               <div style="font-size:10px;color:#4a5568;text-transform:uppercase;letter-spacing:0.06em;margin-top:8px">Revenue</div>
               <div style="font-size:18px;font-weight:600;color:#fff">{format_inr(t_rev)}</div>
-              <div style="font-size:10px;color:#4a5568;margin-top:6px">Default: <span style="color:#c9d1e0">{t_def:.1f}%</span> Â· Users: <span style="color:#c9d1e0">{t_cnt:,}</span></div>
+              <div style="font-size:10px;color:#8f9bb1;margin-top:6px">Default: <span style="color:#c9d1e0">{t_def:.1f}%</span> | Users: <span style="color:#c9d1e0">{t_cnt:,}</span></div>
             </div>""", unsafe_allow_html=True)
 
         # Grouped bar by tier
@@ -722,15 +751,17 @@ def render_portfolio_overview(results_df: pd.DataFrame, users_df: pd.DataFrame) 
                 values="avg_reward_per_user"
             )
             
+            text_labels = pivot.map(lambda v: f"₹{v:,.0f}" if pd.notna(v) else "")
             fig = px.imshow(
                 pivot,
                 color_continuous_scale="Blues",
-                title="Avg reward per user — Risk tier × Income bucket (Thompson)",
-                text_auto=".0f",
+                title="Avg reward per user - Risk tier x Income bucket (Thompson)",
+                text_auto=False,
                 aspect="auto"
             )
             fig = dark_chart(fig, height=400)
-            fig.update_coloraxes(colorbar_tickprefix="₹")
+            fig.update_traces(text=text_labels.values, texttemplate="%{text}")
+            fig.update_coloraxes(colorbar_tickprefix="₹", colorbar_title="Avg Reward")
             st.plotly_chart(fig, width="stretch")
             
             st.caption(
@@ -774,14 +805,17 @@ def render_user_deep_dive(results_df: pd.DataFrame, users_df: pd.DataFrame) -> N
     if "selected_user_id" not in st.session_state:
         st.session_state.selected_user_id = user_ids[0]
 
+    valid_user_ids = set(user_ids)
     sel_col, btn_col = st.columns([3, 1])
     selected_input = sel_col.text_input("User ID", value=st.session_state.selected_user_id,
                                         placeholder="e.g. USER_00042")
     if btn_col.button("🎲 Random User"):
         st.session_state.selected_user_id = str(np.random.default_rng().choice(user_ids))
         st.rerun()
-    elif selected_input in set(user_ids):
+    elif selected_input in valid_user_ids:
         st.session_state.selected_user_id = selected_input
+    elif selected_input:
+        sel_col.caption("User ID not found. Keeping the previous valid selection.")
 
     uid = st.session_state.selected_user_id
     user_row = users_df.loc[users_df["user_id"] == uid]
@@ -808,11 +842,11 @@ def render_user_deep_dive(results_df: pd.DataFrame, users_df: pd.DataFrame) -> N
     rt_color = RISK_TIER_COLORS.get(risk_tier, "#4a5568")
     rt_bg = {"Prime": "#0d2416", "Near-Prime": "#0d1a2d", "Subprime": "#2a1d0a", "Deep-Subprime": "#2a0d0d"}.get(risk_tier, "#1a1f35")
     initials = uid[:2] if len(uid) >= 2 else "U"
-    income = str(user_row.get("income_bucket", "â€”"))
-    cibil = int(user_row["cibil_score"]) if "cibil_score" in user_row.index else "â€”"
-    acct_age = int(user_row["account_age_months"]) if "account_age_months" in user_row.index else "â€”"
+    income = str(user_row.get("income_bucket", "N/A"))
+    cibil = int(user_row["cibil_score"]) if "cibil_score" in user_row.index else "N/A"
+    acct_age = int(user_row["account_age_months"]) if "account_age_months" in user_row.index else "N/A"
     init_limit = float(user_row["initial_credit_limit"]) if "initial_credit_limit" in user_row.index else 0
-    emp_type = str(user_row.get("employment_type", "â€”"))
+    emp_type = str(user_row.get("employment_type", "N/A"))
 
     st.markdown(f"""
     <div style="background:#161b2e;border:0.5px solid #1e2a45;border-radius:10px;padding:20px;
@@ -840,11 +874,12 @@ def render_user_deep_dive(results_df: pd.DataFrame, users_df: pd.DataFrame) -> N
     limit_increases = int((thompson_user["action_taken"] != "keep").sum())
     default_count = int(thompson_user["did_default"].sum())
     total_user_rev = float(thompson_user["reward_received"].sum())
+    default_label = "time" if default_count == 1 else "times"
     st.markdown(f"""
     <div style="background:#0d1a2d;border:0.5px solid #1e2a45;border-radius:8px;
                 padding:10px 16px;font-size:13px;color:#c9d1e0;margin-bottom:16px">
       This user received <b style="color:#3b82f6">{limit_increases}</b> limit increases over 12 months
-      and defaulted <b style="color:#ef4444">{default_count}</b> times.
+        and defaulted <b style="color:#ef4444">{default_count}</b> {default_label}.
       Total revenue generated: <b style="color:#10b981">{format_inr(total_user_rev)}</b>.
     </div>""", unsafe_allow_html=True)
 
@@ -853,7 +888,8 @@ def render_user_deep_dive(results_df: pd.DataFrame, users_df: pd.DataFrame) -> N
     with left:
         fig_limit = go.Figure()
         fig_limit.add_trace(go.Scatter(x=thompson_user["month"], y=thompson_user["current_limit"],
-                                        mode="lines", line=dict(color="#3b82f6", width=2), name="Limit"))
+                                        mode="lines+markers", line=dict(color="#3b82f6", width=2),
+                                        marker=dict(size=5, symbol="circle"), name="Limit"))
         actions_taken = thompson_user[thompson_user["action_taken"] != "keep"]
         if not actions_taken.empty:
             fig_limit.add_trace(go.Scatter(
@@ -874,8 +910,8 @@ def render_user_deep_dive(results_df: pd.DataFrame, users_df: pd.DataFrame) -> N
     # Table
     display_cols = thompson_user[["month", "action_taken", "current_limit", "amount_spent",
                                    "did_default", "reward_received"]].copy()
-    display_cols.columns = ["Month", "Action Taken", "Credit Limit", "Amount Spent",
-                            "Defaulted", "Reward"]
+    display_cols.columns = ["Month", "Action", "Limit", "Spent",
+                            "Default", "Reward (₹)"]
     st.dataframe(display_cols, width="stretch", hide_index=True)
 
     # Explanation section
@@ -904,12 +940,12 @@ def render_user_deep_dive(results_df: pd.DataFrame, users_df: pd.DataFrame) -> N
               
               This user is in the <b style="color:{tier_color}">{escape(risk_tier)}</b> 
               tier with a CIBIL score of <b>{cibil}</b>. 
-              Thompson Sampling started with a uniform Beta(1,1) prior — 
+                            Thompson Sampling started with a uniform Beta(1,1) prior - 
               equal belief in all 4 actions. As monthly outcomes arrived 
               (with a 3-month lag), the Beta distributions updated:
               <br/><br/>
-              • Positive reward months → α increased for that action<br/>
-              • Default months → β increased, making the action less likely 
+                            - Positive reward months: alpha increased for that action<br/>
+                            - Default months: beta increased, making the action less likely 
                 to be sampled in future<br/><br/>
               
               Over 12 months, the bandit took <b>"{escape(most_common)}"</b> most 
@@ -918,7 +954,7 @@ def render_user_deep_dive(results_df: pd.DataFrame, users_df: pd.DataFrame) -> N
               risk profile.<br/><br/>
               
               <span style="color:#4a5568;font-size:11px">
-              Note: decisions in months 1–3 are based purely on prior 
+              Note: decisions in months 1-3 are based purely on prior 
               beliefs (cold start). The bandit only receives its first 
               reward signal at month 4, when the month-1 action's outcome 
               becomes available after the 3-month feedback delay.
@@ -952,12 +988,12 @@ def render_policy_comparison(results_df: pd.DataFrame, users_df: pd.DataFrame) -
                 border:0.5px solid #3b82f6;border-radius:10px;
                 padding:14px 20px;margin-bottom:20px;
                 display:flex;align-items:center;gap:12px">
-      <span style="font-size:20px">ðŸ†</span>
+            <span style="font-size:12px;color:#3b82f6;font-weight:600;text-transform:uppercase;letter-spacing:0.08em">Top Policy</span>
       <div>
         <div style="font-size:13px;font-weight:600;color:#fff">
           {winner} wins with {format_inr(winner_rev)} total revenue</div>
         <div style="font-size:11px;color:#4a5568;margin-top:2px">
-          {lift:.1f}% above static baseline Â· {regret:.1f}% regret vs oracle</div>
+                    {lift:.1f}% above static baseline | {regret:.1f}% regret vs oracle</div>
       </div>
     </div>
     """, unsafe_allow_html=True)
@@ -972,11 +1008,12 @@ def render_policy_comparison(results_df: pd.DataFrame, users_df: pd.DataFrame) -
             fig.add_trace(go.Scatter(x=pdf["month"], y=pdf["cumulative_reward"],
                                      mode="lines+markers", name=policy,
                                      line=dict(color=POLICY_COLORS.get(policy, "#888"), width=2),
-                                     marker=dict(size=4)))
+                                     marker=dict(size=4),
+                                     hovertemplate="Month %{x}<br>₹%{y:,.0f}<extra>%{fullData.name}</extra>"))
         fig.add_vline(x=6, line_dash="dash", line_color="#ef4444", line_width=1,
                       annotation_text="Economic shock", annotation_font_color="#ef4444",
                       annotation_font_size=10)
-        dark_chart(fig, title="Cumulative Reward â€” All Policies", height=360)
+        dark_chart(fig, title="Cumulative Reward - All Policies", height=360)
         st.plotly_chart(fig, width="stretch")
 
         # Monthly delta Thompson - Static
@@ -986,8 +1023,8 @@ def render_policy_comparison(results_df: pd.DataFrame, users_df: pd.DataFrame) -
         colors_delta = ["#10b981" if d >= 0 else "#ef4444" for d in delta_df["delta"]]
         fig_delta = go.Figure()
         fig_delta.add_trace(go.Bar(x=delta_df["month"], y=delta_df["delta"],
-                                   marker_color=colors_delta, name="Δ Revenue"))
-        dark_chart(fig_delta, title="Monthly Revenue Delta (Thompson − Static)", height=280)
+                                   marker_color=colors_delta, name="Delta Revenue"))
+        dark_chart(fig_delta, title="Monthly Revenue Delta (Thompson - Static)", height=280)
         st.plotly_chart(fig_delta, width="stretch")
 
     with tab_regret:
@@ -999,15 +1036,18 @@ def render_policy_comparison(results_df: pd.DataFrame, users_df: pd.DataFrame) -
             if policy_df.empty:
                 continue
             regret_df = compute_regret(oracle_df, policy_df)
+            regret_col = "regret_cumulative" if "regret_cumulative" in regret_df.columns else "regret"
+            if regret_col not in regret_df.columns:
+                continue
             fig_reg.add_trace(go.Scatter(
-                x=regret_df["month"], y=regret_df["regret"],
+                x=regret_df["month"], y=regret_df[regret_col],
                 mode="lines+markers", name=label,
                 line=dict(color=POLICY_COLORS.get(label, "#888"), width=2),
                 marker=dict(size=4)))
             # Annotation at final month
             final = regret_df.iloc[-1] if not regret_df.empty else None
             if final is not None:
-                fig_reg.add_annotation(x=final["month"], y=final["regret"],
+                fig_reg.add_annotation(x=final["month"], y=final[regret_col],
                                        text=f"{final['regret_pct']:.1f}%",
                                        showarrow=True, arrowhead=2, arrowcolor="#4a5568",
                                        font=dict(size=10, color=POLICY_COLORS.get(label, "#888")))
@@ -1055,7 +1095,7 @@ def render_policy_comparison(results_df: pd.DataFrame, users_df: pd.DataFrame) -
                 <td style="padding:10px 12px;text-align:right">
                   {revenue}
                 </td>
-                <td style="padding:10px 12px;text-align:right;color:#4a5568">
+                                <td style="padding:10px 12px;text-align:right;color:#a3b0c5">
                   {default_rate}
                 </td>
                 <td style="padding:10px 12px;text-align:right">
@@ -1072,10 +1112,11 @@ def render_policy_comparison(results_df: pd.DataFrame, users_df: pd.DataFrame) -
             
             headers = ["Policy", "Revenue", "Default Rate", 
                       "Regret vs Oracle", "Convergence", "Exploration"]
-            header_html = "".join(
-                f"<th style='padding:8px 12px;text-align:{"right" if i > 1 else "left"};font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:#4a5568;font-weight:500'>{h}</th>"
-                for i, h in enumerate(headers)
-            )
+            aligns = ["left"] + ["right"] * (len(headers) - 1)
+            header_cells = ""
+            for h, a in zip(headers, aligns):
+                header_cells += f"<th style='padding:8px 12px;text-align:{a};font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:#93a1b9;font-weight:500'>{h}</th>"
+            header_html = header_cells
             
             st.markdown(f"""
             <div style="overflow-x:auto;border:0.5px solid #1e2a45;
@@ -1106,25 +1147,26 @@ def render_live_simulation(users_df: pd.DataFrame, results_df: pd.DataFrame) -> 
     with left_col:
         st.markdown("""<div style="background:#161b2e;border:0.5px solid #1e2a45;
             border-radius:10px;padding:20px">
-            <div style="font-size:14px;font-weight:600;color:#fff;margin-bottom:16px">
+            <div style="font-size:14px;font-weight:600;color:#fff;margin-bottom:16px;
+                        letter-spacing:-0.01em">
             Simulation Parameters</div>
         </div>""", unsafe_allow_html=True)
 
-        economic_stress = st.slider("Economic stress multiplier",
+        economic_stress = st.slider("Economic Stress Multiplier",
                                      min_value=1.0, max_value=3.0, value=1.0, step=0.1,
                                      help="1.0 = normal, 2.0 = default rates double (COVID-like shock)")
         fraud_spike_toggle = st.toggle("Fraud spike at month 9",
                                         help="Doubles Deep-Subprime defaults at month 9")
 
         st.markdown("""<div style="font-size:12px;font-weight:500;color:#c9d1e0;margin:12px 0 4px">
-            Risk distribution (must sum to 100%)</div>""", unsafe_allow_html=True)
-        prime_pct = st.slider("Prime %", 10, 70, 40)
-        near_prime_pct = st.slider("Near-Prime %", 10, 60, 30)
-        subprime_pct = st.slider("Subprime %", 5, 50, 20)
+            Risk Distribution (must sum to 100%)</div>""", unsafe_allow_html=True)
+        prime_pct = st.slider("Prime (%)", 10, 70, 40)
+        near_prime_pct = st.slider("Near-Prime (%)", 10, 60, 30)
+        subprime_pct = st.slider("Subprime (%)", 5, 50, 20)
         deep_sub_pct = 100 - prime_pct - near_prime_pct - subprime_pct
 
         if deep_sub_pct < 0:
-            st.warning("⚠️ Distribution exceeds 100% – adjust sliders")
+            st.warning("Distribution exceeds 100% - adjust sliders")
         else:
             st.markdown(f"""
             <div style="background:#161b2e;border:0.5px solid #1e2a45;border-radius:6px;
@@ -1132,8 +1174,8 @@ def render_live_simulation(users_df: pd.DataFrame, results_df: pd.DataFrame) -> 
               Deep-Subprime auto-set to <b style="color:#ef4444">{deep_sub_pct}%</b>
             </div>""", unsafe_allow_html=True)
 
-        n_months = st.select_slider("Horizon", options=[6, 9, 12], value=12)
-        run_btn = st.button("▶ Run Simulation", width="stretch")
+        n_months = st.select_slider("Simulation Horizon (months)", options=[6, 9, 12], value=12)
+        run_btn = st.button("Run Simulation", width="stretch")
 
     risk_distribution = {"Prime": prime_pct, "Near-Prime": near_prime_pct,
                          "Subprime": subprime_pct, "Deep-Subprime": max(deep_sub_pct, 0)}
@@ -1159,9 +1201,9 @@ def render_live_simulation(users_df: pd.DataFrame, results_df: pd.DataFrame) -> 
             st.markdown("""
             <div style="background:#161b2e;border:1px dashed #1e2a45;
                         border-radius:10px;padding:48px;text-align:center">
-              <div style="font-size:32px;margin-bottom:12px">⚡</div>
-              <div style="color:#4a5568;font-size:13px">
-                Configure parameters and click Run Simulation</div>
+              <div style="font-size:28px;margin-bottom:12px;opacity:0.6">⚡</div>
+              <div style="color:#8f9bb1;font-size:14px">
+                Configure parameters and click <strong>Run Simulation</strong></div>
             </div>""", unsafe_allow_html=True)
         else:
             static_df = results_df.loc[results_df["policy"] == "static_baseline"]
@@ -1173,11 +1215,11 @@ def render_live_simulation(users_df: pd.DataFrame, results_df: pd.DataFrame) -> 
             st.markdown(f"""
             <div style="background:#0d2416;border:0.5px solid #0f3d22;border-radius:8px;
                         padding:10px 16px;font-size:13px;color:#10b981;margin-bottom:12px">
-              ✓ Simulation complete – Thompson Sampling: {format_inr(live_total)} total revenue
+              Simulation complete &mdash; Thompson Sampling: {format_inr(live_total)} total revenue
             </div>""", unsafe_allow_html=True)
 
             mc1, mc2, mc3 = st.columns(3)
-            mc1.metric("Revenue vs Standard", f"{rev_lift:+.1f}%")
+            mc1.metric("Revenue vs Static", f"{rev_lift:+.1f}%")
             mc2.metric("Default Rate", f"{def_rate:.2f}%")
             n_m = st.session_state.get("live_n_months", 12)
             # Convergence
@@ -1220,7 +1262,7 @@ def render_live_simulation(users_df: pd.DataFrame, results_df: pd.DataFrame) -> 
                 fig_a = go.Figure()
                 for action in ["keep", "plus_10", "plus_20", "plus_50"]:
                     adf = act_m[act_m["action_taken"] == action]
-                    fig_a.add_trace(go.Bar(x=adf["month"], y=adf["pct"], name=action,
+                    fig_a.add_trace(go.Bar(x=adf["month"], y=adf["pct"], name=ACTION_LABELS.get(action, action),
                                            marker_color=ACTION_COLORS.get(action, "#888")))
                 fig_a.update_layout(barmode="stack")
                 dark_chart(fig_a, title="Action Distribution (%)", height=280)
@@ -1248,7 +1290,7 @@ def render_sidebar():
 
         st.divider()
 
-        st.markdown("""<div style="font-size:10px;color:#4a5568;text-transform:uppercase;
+        st.markdown("""<div style="font-size:10px;color:#8f9bb1;text-transform:uppercase;
                     letter-spacing:0.06em;margin-bottom:10px">Simulation Config</div>""",
                     unsafe_allow_html=True)
 
@@ -1257,8 +1299,8 @@ def render_sidebar():
         for k, v in config_items.items():
             st.markdown(f"""
             <div style="display:flex;justify-content:space-between;
-                        padding:4px 0;border-bottom:0.5px solid #1e2a45">
-              <span style="font-size:11px;color:#4a5568">{k}</span>
+                        padding:5px 0;border-bottom:0.5px solid #1e2a45">
+              <span style="font-size:11px;color:#8f9bb1">{k}</span>
               <span style="font-size:11px;color:#c9d1e0;font-weight:500">{v}</span>
             </div>""", unsafe_allow_html=True)
 
@@ -1272,10 +1314,10 @@ def render_sidebar():
                        background:#10b981;display:inline-block"></span>
           Results loaded</div>""", unsafe_allow_html=True)
 
+        st.divider()
         st.markdown(f"""
-        <div style="position:absolute;bottom:16px;left:16px;right:16px;
-                    font-size:10px;color:#2a3050;text-align:center">
-          Thompson Sampling · UCB · ε-Greedy<br/>
+        <div style="font-size:10px;color:#2a3050;text-align:center;padding:4px 0">
+          Thompson Sampling | UCB | Epsilon-Greedy<br/>
           <a href="{GITHUB_URL}" style="color:#3b82f6;text-decoration:none">GitHub ↗</a>
         </div>""", unsafe_allow_html=True)
 
