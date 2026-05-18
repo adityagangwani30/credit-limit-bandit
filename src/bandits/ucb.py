@@ -80,7 +80,9 @@ class UCBBandit(ContextualBandit):
     def _key(self, context: np.ndarray, action: str) -> tuple[str, str]:
         return (self._risk_segment(context), str(action))
 
-    def select_action(self, context: np.ndarray, user_id: str, actions: list[str]) -> str:
+    def select_action(
+        self, context: np.ndarray, user_id: str, actions: list[str]
+    ) -> str:
         if not actions:
             raise ValueError("actions must not be empty")
         if context is None or not np.isfinite(np.asarray(context, dtype=float)).all():
@@ -89,14 +91,18 @@ class UCBBandit(ContextualBandit):
         self.total_selections += 1
         eligible_actions = self._eligible_actions(context, actions)
         unseen = [
-            action for action in eligible_actions
+            action
+            for action in eligible_actions
             if self.counts.get(self._key(context, action), 0) == 0
         ]
         if len(unseen) == len(eligible_actions):
             self.last_selected_action = eligible_actions[0]
             return eligible_actions[0]
 
-        total_pulls = sum(self.counts.get(self._key(context, action), 0) for action in eligible_actions)
+        total_pulls = sum(
+            self.counts.get(self._key(context, action), 0)
+            for action in eligible_actions
+        )
         total_pulls = max(total_pulls, 1)
 
         scores: dict[str, float] = {}
@@ -114,7 +120,9 @@ class UCBBandit(ContextualBandit):
         self.last_selected_action = best_action
         return best_action
 
-    def update(self, user_id: str, action: str, reward: float, context: np.ndarray) -> None:
+    def update(
+        self, user_id: str, action: str, reward: float, context: np.ndarray
+    ) -> None:
         if context is None or not np.isfinite(np.asarray(context, dtype=float)).all():
             raise ValueError("context must contain only finite values")
         key = self._key(context, action)

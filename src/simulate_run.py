@@ -25,6 +25,7 @@ from src.simulator import simulate_month
 try:
     from tqdm import tqdm
 except ImportError:  # pragma: no cover
+
     class _TqdmFallback:
         def __call__(self, iterable=None, total=None, desc=None, leave=True, **kwargs):
             return iterable
@@ -85,7 +86,10 @@ def _simulate_policy(
     user_ids = [record["user_id"] for record in user_records]
     n_users = len(user_records)
 
-    current_limits = {record["user_id"]: float(record["initial_credit_limit"]) for record in user_records}
+    current_limits = {
+        record["user_id"]: float(record["initial_credit_limit"])
+        for record in user_records
+    }
     histories: dict[str, list[dict]] = {user_id: [] for user_id in user_ids}
 
     if bandit is not None:
@@ -115,7 +119,9 @@ def _simulate_policy(
                     reward=float(ready_reward["reward"]),
                     context=np.asarray(ready_reward["context"], dtype=np.float32),
                 )
-            log_index = row_lookup[(ready_reward["user_id"], ready_reward["action_month"])]
+            log_index = row_lookup[
+                (ready_reward["user_id"], ready_reward["action_month"])
+            ]
             logs[log_index]["reward_received"] = float(ready_reward["reward"])
             logs[log_index]["reward_ready_month"] = month
             logs[log_index]["reward_is_default"] = bool(ready_reward["is_default"])
@@ -125,7 +131,11 @@ def _simulate_policy(
             context = context_builder.build_context(user_id, histories[user_id])
 
             if fixed_action is not None:
-                action = fixed_action if fixed_action_mode == "repeat" or month == 1 else "keep"
+                action = (
+                    fixed_action
+                    if fixed_action_mode == "repeat" or month == 1
+                    else "keep"
+                )
             else:
                 action = bandit.select_action(context, user_id, action_space)
 
@@ -151,12 +161,18 @@ def _simulate_policy(
             )
 
             if show_progress and (user_index % 1000 == 0 or user_index == n_users):
-                tqdm.write(f"Month {month}: processed {user_index}/{n_users} users for {policy_label or 'policy'}")
+                tqdm.write(
+                    f"Month {month}: processed {user_index}/{n_users} users for {policy_label or 'policy'}"
+                )
 
         simulation_input = working_users.copy()
-        simulation_input["initial_credit_limit"] = simulation_input["user_id"].map(current_limits).astype(float)
+        simulation_input["initial_credit_limit"] = (
+            simulation_input["user_id"].map(current_limits).astype(float)
+        )
         stress = _resolve_stress(month, economic_stress_fn)
-        outcomes = simulate_month(simulation_input, month_num=month, economic_stress=stress)
+        outcomes = simulate_month(
+            simulation_input, month_num=month, economic_stress=stress
+        )
         outcome_map = outcomes.set_index("user_id").to_dict("index")
 
         for user_id in user_ids:
@@ -249,10 +265,12 @@ def run_static_action(
     )
 
 
-def run_theoretical_oracle(users_df: pd.DataFrame, n_months: int = 12, seed: int = 42) -> pd.DataFrame:
+def run_theoretical_oracle(
+    users_df: pd.DataFrame, n_months: int = 12, seed: int = 42
+) -> pd.DataFrame:
     """
     Build an oracle policy in hindsight from completed fixed-action runs.
-    
+
     Theoretical oracle: for each user at each month, look at what reward
     each action would have produced (in hindsight), then assign the action
     that produced the maximum reward. This is an unreachable upper bound
@@ -260,7 +278,7 @@ def run_theoretical_oracle(users_df: pd.DataFrame, n_months: int = 12, seed: int
     """
     all_action_results = {}
     actions = ContextBuilder.get_action_space()
-    
+
     for action in actions:
         df = _simulate_policy(
             users_df=users_df.copy(),
@@ -272,33 +290,37 @@ def run_theoretical_oracle(users_df: pd.DataFrame, n_months: int = 12, seed: int
             policy_label=f"oracle_source_{action}",
         )
         all_action_results[action] = df
-    
+
     # Concatenate all actions
     oracle_source = pd.concat(list(all_action_results.values()), ignore_index=True)
-    
+
     # Ensure consistent data types
-    oracle_source = oracle_source.astype({
-        "month": "int64",
-        "user_id": "str",
-        "action_taken": "str",
-        "reward_received": "float64",
-    })
-    
+    oracle_source = oracle_source.astype(
+        {
+            "month": "int64",
+            "user_id": "str",
+            "action_taken": "str",
+            "reward_received": "float64",
+        }
+    )
+
     # Sort by (month, user_id, reward_received) to get best reward first per group
     oracle_source = oracle_source.sort_values(
         by=["month", "user_id", "reward_received"],
         ascending=[True, True, False],
-        na_position="last"
+        na_position="last",
     )
-    
+
     # Get best (first) row per user-month
     oracle_best = oracle_source.groupby(["month", "user_id"], as_index=False).first()
     oracle_best["policy"] = "oracle_theoretical"
-    
+
     return oracle_best
 
 
-def run_practical_oracle(users_df: pd.DataFrame, n_months: int = 12, seed: int = 42) -> pd.DataFrame:
+def run_practical_oracle(
+    users_df: pd.DataFrame, n_months: int = 12, seed: int = 42
+) -> pd.DataFrame:
     """
     Practical oracle: for each user, find the single best action
     to apply for the entire horizon.
@@ -322,16 +344,20 @@ def run_practical_oracle(users_df: pd.DataFrame, n_months: int = 12, seed: int =
     chosen_frames: list[pd.DataFrame] = []
     for user_id, action_rewards in user_totals.items():
         best_action = max(action_rewards, key=action_rewards.get)
-        chosen_user_path = all_action_results[best_action].loc[
-            all_action_results[best_action]["user_id"] == user_id
-        ].copy()
+        chosen_user_path = (
+            all_action_results[best_action]
+            .loc[all_action_results[best_action]["user_id"] == user_id]
+            .copy()
+        )
         chosen_user_path["policy"] = "oracle_practical"
         chosen_frames.append(chosen_user_path)
 
     return pd.concat(chosen_frames, ignore_index=True)
 
 
-def run_oracle(users_df: pd.DataFrame, n_months: int = 12, seed: int = 42) -> pd.DataFrame:
+def run_oracle(
+    users_df: pd.DataFrame, n_months: int = 12, seed: int = 42
+) -> pd.DataFrame:
     """Backward-compatible alias for the theoretical oracle."""
 
     return run_theoretical_oracle(users_df, n_months=n_months, seed=seed)
@@ -356,7 +382,9 @@ def _load_users() -> pd.DataFrame:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run contextual credit-limit simulations.")
+    parser = argparse.ArgumentParser(
+        description="Run contextual credit-limit simulations."
+    )
     parser.add_argument(
         "--policy",
         default="all",
@@ -374,8 +402,12 @@ def main() -> None:
         ],
         help="Run one policy or all policies.",
     )
-    parser.add_argument("--n_months", type=int, default=12, help="Number of months to simulate.")
-    parser.add_argument("--n_users", type=int, default=None, help="Optional cap on number of users.")
+    parser.add_argument(
+        "--n_months", type=int, default=12, help="Number of months to simulate."
+    )
+    parser.add_argument(
+        "--n_users", type=int, default=None, help="Optional cap on number of users."
+    )
     args = parser.parse_args()
 
     users_df = _load_users()
@@ -392,12 +424,20 @@ def main() -> None:
     thompson_df = None
 
     if args.policy in {"all", "thompson", "thompson_sampling"}:
-        thompson_df = run_simulation(ThompsonSampling(), users_df, n_months=args.n_months, seed=42)
+        thompson_df = run_simulation(
+            ThompsonSampling(), users_df, n_months=args.n_months, seed=42
+        )
         all_results.append(thompson_df)
     if args.policy in {"all", "ucb"}:
-        all_results.append(run_simulation(UCBBandit(), users_df, n_months=args.n_months, seed=42))
+        all_results.append(
+            run_simulation(UCBBandit(), users_df, n_months=args.n_months, seed=42)
+        )
     if args.policy in {"all", "epsilon_greedy"}:
-        all_results.append(run_simulation(EpsilonGreedyBandit(), users_df, n_months=args.n_months, seed=42))
+        all_results.append(
+            run_simulation(
+                EpsilonGreedyBandit(), users_df, n_months=args.n_months, seed=42
+            )
+        )
     if args.policy in {"all", "static", "static_baseline"}:
         all_results.append(run_static_baseline(users_df, n_months=args.n_months))
     theoretical_oracle_df = None
@@ -411,7 +451,9 @@ def main() -> None:
         all_results.append(practical_oracle_df)
 
     combined_results = pd.concat(all_results, ignore_index=True)
-    output_path = Path(__file__).resolve().parents[1] / "data" / "simulation_results.csv"
+    output_path = (
+        Path(__file__).resolve().parents[1] / "data" / "simulation_results.csv"
+    )
     output_path.parent.mkdir(parents=True, exist_ok=True)
     combined_results.to_csv(output_path, index=False)
 
@@ -427,7 +469,9 @@ def main() -> None:
 
     if thompson_df is not None:
         if theoretical_oracle_df is None:
-            theoretical_oracle_df = run_theoretical_oracle(users_df, n_months=args.n_months)
+            theoretical_oracle_df = run_theoretical_oracle(
+                users_df, n_months=args.n_months
+            )
         if practical_oracle_df is None:
             practical_oracle_df = run_practical_oracle(users_df, n_months=args.n_months)
 

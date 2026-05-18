@@ -7,7 +7,6 @@ from typing import Iterable
 import numpy as np
 import pandas as pd
 
-
 INCOME_PERCENTILE_MAP: dict[str, float] = {
     "low": 0.25,
     "mid": 0.50,
@@ -47,7 +46,9 @@ class ContextBuilder:
             raise ValueError("users_df must include a user_id column")
         self.users_df = users_df.copy()
         self._users_by_id = self.users_df.set_index("user_id", drop=False)
-        self.income_percentiles = self.users_df["income_bucket"].map(INCOME_PERCENTILE_MAP).fillna(0.0)
+        self.income_percentiles = (
+            self.users_df["income_bucket"].map(INCOME_PERCENTILE_MAP).fillna(0.0)
+        )
 
     def build_context(self, user_id: str, month_history: list[dict]) -> np.ndarray:
         if user_id not in self._users_by_id.index:
@@ -57,16 +58,32 @@ class ContextBuilder:
         current_limit = self._resolve_current_limit(user, month_history)
         current_outstanding = self._resolve_current_outstanding(month_history)
 
-        credit_utilization = _clip01(current_outstanding / current_limit) if current_limit > 0 else 0.0
-        payment_streak_norm = _clip01(float(user["payment_streak"]) / MAX_PAYMENT_STREAK)
-        income_percentile = _clip01(INCOME_PERCENTILE_MAP.get(str(user["income_bucket"]), 0.0))
-        delinquency_score = _clip01(1.0 - float(user["delinquency_count"]) / MAX_DELINQUENCY_COUNT)
+        credit_utilization = (
+            _clip01(current_outstanding / current_limit) if current_limit > 0 else 0.0
+        )
+        payment_streak_norm = _clip01(
+            float(user["payment_streak"]) / MAX_PAYMENT_STREAK
+        )
+        income_percentile = _clip01(
+            INCOME_PERCENTILE_MAP.get(str(user["income_bucket"]), 0.0)
+        )
+        delinquency_score = _clip01(
+            1.0 - float(user["delinquency_count"]) / MAX_DELINQUENCY_COUNT
+        )
         account_age_norm = _clip01(float(user["account_age_months"]) / MAX_ACCOUNT_AGE)
         spending_volatility = self._calculate_spending_volatility(month_history)
-        transaction_freq_norm = _clip01(float(user["transaction_frequency"]) / MAX_TRANSACTION_FREQUENCY)
-        cibil_norm = _clip01((float(user["cibil_score"]) - MIN_CIBIL_SCORE) / CIBIL_SCORE_RANGE)
-        months_of_history_norm = _clip01(min(len(month_history), int(MAX_HISTORY_MONTHS)) / MAX_HISTORY_MONTHS)
-        current_limit_norm = _clip01(np.log10(max(current_limit, 1.0)) / np.log10(MAX_CREDIT_LIMIT))
+        transaction_freq_norm = _clip01(
+            float(user["transaction_frequency"]) / MAX_TRANSACTION_FREQUENCY
+        )
+        cibil_norm = _clip01(
+            (float(user["cibil_score"]) - MIN_CIBIL_SCORE) / CIBIL_SCORE_RANGE
+        )
+        months_of_history_norm = _clip01(
+            min(len(month_history), int(MAX_HISTORY_MONTHS)) / MAX_HISTORY_MONTHS
+        )
+        current_limit_norm = _clip01(
+            np.log10(max(current_limit, 1.0)) / np.log10(MAX_CREDIT_LIMIT)
+        )
 
         context = np.array(
             [
@@ -100,7 +117,9 @@ class ContextBuilder:
         updated_limit = float(current_limit) * ACTION_MULTIPLIERS[action]
         return round(min(updated_limit, MAX_CREDIT_LIMIT), 2)
 
-    def _resolve_current_limit(self, user: pd.Series, month_history: list[dict]) -> float:
+    def _resolve_current_limit(
+        self, user: pd.Series, month_history: list[dict]
+    ) -> float:
         if not month_history:
             return float(user["initial_credit_limit"])
 
@@ -128,7 +147,13 @@ class ContextBuilder:
         if len(history_list) < 3:
             return 0.0
 
-        recent_spend = np.array([max(float(month.get("amount_spent", 0.0)), 0.0) for month in history_list[-3:]], dtype=float)
+        recent_spend = np.array(
+            [
+                max(float(month.get("amount_spent", 0.0)), 0.0)
+                for month in history_list[-3:]
+            ],
+            dtype=float,
+        )
         mean_spend = float(np.mean(recent_spend))
         if mean_spend <= 0:
             return 0.0

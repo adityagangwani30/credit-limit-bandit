@@ -6,7 +6,6 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
 
-
 INTERCHANGE_RATE = 0.018
 
 
@@ -20,7 +19,9 @@ class RewardEngine:
         return float(amount_spent) * INTERCHANGE_RATE
 
     @staticmethod
-    def calculate_default_penalty(outstanding_amount: float, did_default: bool) -> float:
+    def calculate_default_penalty(
+        outstanding_amount: float, did_default: bool
+    ) -> float:
         if float(outstanding_amount) < 0:
             raise ValueError("outstanding_amount must be >= 0")
         return -float(outstanding_amount) if did_default else 0.0
@@ -32,7 +33,9 @@ class RewardEngine:
         outstanding_amount: float,
         did_default: bool,
     ) -> float:
-        return cls.calculate_immediate_fee(amount_spent) + cls.calculate_default_penalty(
+        return cls.calculate_immediate_fee(
+            amount_spent
+        ) + cls.calculate_default_penalty(
             outstanding_amount,
             did_default,
         )
@@ -76,7 +79,9 @@ class RewardBuffer:
             )
         )
 
-    def receive_outcome(self, user_id, month, amount_spent, outstanding_amount, did_default) -> None:
+    def receive_outcome(
+        self, user_id, month, amount_spent, outstanding_amount, did_default
+    ) -> None:
         if int(month) < 1:
             raise ValueError("month must be >= 1")
         if float(outstanding_amount) < 0:
@@ -121,12 +126,12 @@ class RewardBuffer:
 
         self._pending_actions = still_pending
         for reward in ready_rewards:
-            assert isinstance(reward["user_id"], str), (
-                f"user_id must be str, got {type(reward['user_id'])}"
-            )
-            assert isinstance(reward["action"], str), (
-                f"action must be str, got {type(reward['action'])}"
-            )
+            assert isinstance(
+                reward["user_id"], str
+            ), f"user_id must be str, got {type(reward['user_id'])}"
+            assert isinstance(
+                reward["action"], str
+            ), f"action must be str, got {type(reward['action'])}"
         return ready_rewards
 
     def pending_count(self) -> int:

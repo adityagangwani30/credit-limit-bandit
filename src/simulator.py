@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
-
 
 RISK_TIER_WEIGHTS: dict[str, float] = {
     "Prime": 0.40,
@@ -154,7 +152,9 @@ def _sample_user(
     elif age_bucket == "18-25" and income_bucket == "very_high":
         income_bucket = generator.choice(["mid", "high"], p=[0.7, 0.3])
     elif age_bucket == "51+" and employment_type == "student":
-        employment_type = generator.choice(["salaried", "self_employed", "gig"], p=[0.45, 0.35, 0.20])
+        employment_type = generator.choice(
+            ["salaried", "self_employed", "gig"], p=[0.45, 0.35, 0.20]
+        )
 
     cibil_min, cibil_max = profile["cibil_range"]
     score_drift = {
@@ -163,7 +163,9 @@ def _sample_user(
         "high": 14,
         "very_high": 24,
     }[income_bucket]
-    cibil_score = int(np.clip(generator.integers(cibil_min, cibil_max + 1) + score_drift, 300, 900))
+    cibil_score = int(
+        np.clip(generator.integers(cibil_min, cibil_max + 1) + score_drift, 300, 900)
+    )
 
     streak_min, streak_max = profile["payment_streak_range"]
     payment_streak = int(generator.integers(streak_min, streak_max + 1))
@@ -175,7 +177,9 @@ def _sample_user(
         payment_streak = min(36, payment_streak + int(generator.integers(0, 4)))
 
     util_alpha, util_beta = profile["utilization_beta"]
-    utilization_ratio = float(np.clip(generator.beta(util_alpha, util_beta), 0.02, 0.98))
+    utilization_ratio = float(
+        np.clip(generator.beta(util_alpha, util_beta), 0.02, 0.98)
+    )
     if income_bucket == "low":
         utilization_ratio = float(np.clip(utilization_ratio + 0.06, 0.02, 0.98))
     elif income_bucket == "very_high":
@@ -199,7 +203,9 @@ def _sample_user(
         account_age_months = min(account_age_months, int(generator.integers(1, 25)))
     account_age_months = min(max(account_age_months, 1), 120)
 
-    delinquency_count = int(generator.choice(np.arange(6), p=profile["delinquency_probs"]))
+    delinquency_count = int(
+        generator.choice(np.arange(6), p=profile["delinquency_probs"])
+    )
     if payment_streak >= 24:
         delinquency_count = max(0, delinquency_count - 1)
     if utilization_ratio >= 0.75 and delinquency_count < 5:
@@ -209,9 +215,13 @@ def _sample_user(
     tx_low, tx_high = profile["transaction_range"]
     transaction_frequency = int(generator.integers(tx_low, tx_high + 1))
     if spending_category == "lifestyle":
-        transaction_frequency = min(40, transaction_frequency + int(generator.integers(2, 7)))
+        transaction_frequency = min(
+            40, transaction_frequency + int(generator.integers(2, 7))
+        )
     elif spending_category == "essentials":
-        transaction_frequency = max(1, transaction_frequency - int(generator.integers(0, 4)))
+        transaction_frequency = max(
+            1, transaction_frequency - int(generator.integers(0, 4))
+        )
 
     initial_credit_limit = _sample_credit_limit(generator, risk_tier, income_bucket)
 
@@ -238,8 +248,13 @@ def generate_users(n: int = 10000, seed: int = 42) -> pd.DataFrame:
     if n <= 0:
         raise ValueError("n must be > 0")
     generator = _rng(seed)
-    risk_tiers = generator.choice(RISK_TIER_ORDER, size=n, p=list(RISK_TIER_WEIGHTS.values()))
-    users = [_sample_user(generator, index, risk_tier) for index, risk_tier in enumerate(risk_tiers, start=1)]
+    risk_tiers = generator.choice(
+        RISK_TIER_ORDER, size=n, p=list(RISK_TIER_WEIGHTS.values())
+    )
+    users = [
+        _sample_user(generator, index, risk_tier)
+        for index, risk_tier in enumerate(risk_tiers, start=1)
+    ]
     return pd.DataFrame(asdict(user) for user in users)
 
 
@@ -262,10 +277,14 @@ def simulate_month(
     working_df = users_df.copy()
     credit_limits = working_df["initial_credit_limit"].to_numpy(dtype=float)
     if np.any(~np.isfinite(credit_limits)) or np.any(credit_limits <= 0):
-        raise ValueError("initial_credit_limit values must all be positive finite numbers")
+        raise ValueError(
+            "initial_credit_limit values must all be positive finite numbers"
+        )
 
     target_ratio = generator.normal(loc=0.60, scale=0.12, size=len(working_df))
-    spend_scaler = working_df["income_bucket"].map(INCOME_SPEND_MULTIPLIER).to_numpy(dtype=float)
+    spend_scaler = (
+        working_df["income_bucket"].map(INCOME_SPEND_MULTIPLIER).to_numpy(dtype=float)
+    )
     amount_spent = credit_limits * np.clip(
         target_ratio * spend_scaler,
         0.40,
@@ -279,13 +298,23 @@ def simulate_month(
         1.0,
     )
 
-    base_rates = working_df["risk_tier"].map(RISK_DEFAULT_BASE_RATE).to_numpy(dtype=float)
-    stress_sensitivity = working_df["risk_tier"].map(RISK_STRESS_SENSITIVITY).to_numpy(dtype=float)
+    base_rates = (
+        working_df["risk_tier"].map(RISK_DEFAULT_BASE_RATE).to_numpy(dtype=float)
+    )
+    stress_sensitivity = (
+        working_df["risk_tier"].map(RISK_STRESS_SENSITIVITY).to_numpy(dtype=float)
+    )
     stored_utilization = working_df["utilization_ratio"].to_numpy(dtype=float)
-    delinquency_penalty = 1.0 + 0.02 * working_df["delinquency_count"].to_numpy(dtype=float)
-    streak_discount = np.clip(1.0 - 0.002 * working_df["payment_streak"].to_numpy(dtype=float), 0.92, 1.0)
+    delinquency_penalty = 1.0 + 0.02 * working_df["delinquency_count"].to_numpy(
+        dtype=float
+    )
+    streak_discount = np.clip(
+        1.0 - 0.002 * working_df["payment_streak"].to_numpy(dtype=float), 0.92, 1.0
+    )
 
-    utilization_multiplier = 0.81 + 0.20 * current_utilization + 0.08 * stored_utilization
+    utilization_multiplier = (
+        0.81 + 0.20 * current_utilization + 0.08 * stored_utilization
+    )
     stress_multiplier = 1.0 + max(economic_stress - 1.0, 0.0) * stress_sensitivity
     if economic_stress < 1.0:
         stress_multiplier = np.clip(
@@ -295,7 +324,11 @@ def simulate_month(
         )
 
     default_probability = np.clip(
-        base_rates * utilization_multiplier * stress_multiplier * delinquency_penalty * streak_discount,
+        base_rates
+        * utilization_multiplier
+        * stress_multiplier
+        * delinquency_penalty
+        * streak_discount,
         0.0005,
         0.95,
     )
@@ -316,33 +349,3 @@ def simulate_month(
             "outstanding_amount": np.round(outstanding_amount, 2),
         }
     )
-
-
-def _print_validation(users_df: pd.DataFrame, month_df: pd.DataFrame) -> None:
-    default_rate = month_df["did_default"].mean() * 100
-    mean_spending = (
-        month_df.merge(users_df[["user_id", "risk_tier"]], on="user_id", how="left")
-        .groupby("risk_tier", sort=False)["amount_spent"]
-        .mean()
-        .reindex(RISK_TIER_ORDER)
-        .round(2)
-    )
-    user_counts = users_df["risk_tier"].value_counts(normalize=False).reindex(RISK_TIER_ORDER, fill_value=0)
-
-    print(f"Aggregate default rate: {default_rate:.2f}%")
-    print("Mean spending by risk tier (INR):")
-    for risk_tier, amount in mean_spending.items():
-        print(f"  {risk_tier}: {amount:.2f}")
-    print("User count per tier:")
-    for risk_tier, count in user_counts.items():
-        print(f"  {risk_tier}: {count}")
-
-
-if __name__ == "__main__":
-    users = generate_users(n=10000, seed=42)
-    output_path = Path(__file__).resolve().parents[1] / "data" / "synthetic_users.csv"
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    users.to_csv(output_path, index=False)
-
-    first_month = simulate_month(users, month_num=1, economic_stress=1.0)
-    _print_validation(users, first_month)

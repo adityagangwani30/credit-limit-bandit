@@ -2,11 +2,11 @@ import pandas as pd
 
 from src.bandits.thompson import ThompsonSampling
 from src.evaluate import (
+    build_full_metrics_table,
+    compute_cold_start_performance,
     compute_convergence_month,
     compute_exploration_ratio_dict,
-    compute_cold_start_performance,
     compute_shock_recovery,
-    build_full_metrics_table,
 )
 from src.simulate_run import run_simulation
 from src.simulator import generate_users
@@ -37,10 +37,10 @@ def test_convergence_month_is_reasonable():
     """Convergence month should happen between month 1 and 12."""
     users_df = generate_users(n=100, seed=21)
     results_df = run_simulation(ThompsonSampling(), users_df, n_months=12, seed=21)
-    
+
     # Add a dummy policy column to match full results structure
     results_df["policy"] = "thompson_sampling"
-    
+
     month = compute_convergence_month(results_df, "thompson_sampling")
     assert 1 <= month <= 12, f"Convergence month {month} out of range [1, 12]"
 
@@ -49,11 +49,13 @@ def test_exploration_ratio_sums_to_100():
     """Exploration ratio components should sum to 100%."""
     users_df = generate_users(n=100, seed=21)
     results_df = run_simulation(ThompsonSampling(), users_df, n_months=12, seed=21)
-    
+
     results_df["policy"] = "thompson_sampling"
-    
+
     exp = compute_exploration_ratio_dict(results_df, "thompson_sampling")
-    total = exp["keep_pct"] + exp["plus_10_pct"] + exp["plus_20_pct"] + exp["plus_50_pct"]
+    total = (
+        exp["keep_pct"] + exp["plus_10_pct"] + exp["plus_20_pct"] + exp["plus_50_pct"]
+    )
     assert abs(total - 100.0) < 0.01, f"Action percentages sum to {total}, not 100"
 
 
@@ -61,9 +63,9 @@ def test_shock_recovery_returns_valid_structure():
     """Shock recovery should return expected keys and valid relationships."""
     users_df = generate_users(n=100, seed=21)
     results_df = run_simulation(ThompsonSampling(), users_df, n_months=12, seed=21)
-    
+
     results_df["policy"] = "thompson_sampling"
-    
+
     shock = compute_shock_recovery(results_df, "thompson_sampling")
     assert "months_to_recovery" in shock
     assert "pre_shock_default_rate" in shock
@@ -77,14 +79,12 @@ def test_cold_start_warm_reward_is_higher_or_equal():
     """Warm reward should be >= cold start reward (learning improves over time)."""
     users_df = generate_users(n=100, seed=21)
     results_df = run_simulation(ThompsonSampling(), users_df, n_months=12, seed=21)
-    
+
     results_df["policy"] = "thompson_sampling"
-    
+
     cs = compute_cold_start_performance(results_df, users_df, "thompson_sampling")
     # Warm reward should be >= cold start (learning should improve)
-    assert (
-        cs["warm_avg_reward"] >= cs["cold_start_avg_reward"]
-    ), (
+    assert cs["warm_avg_reward"] >= cs["cold_start_avg_reward"], (
         f"Warm reward {cs['warm_avg_reward']} < cold start {cs['cold_start_avg_reward']} "
         "— model should learn over time"
     )
@@ -94,16 +94,16 @@ def test_full_metrics_table_has_expected_columns():
     """Build full metrics table and verify structure."""
     users_df = generate_users(n=100, seed=21)
     results_df = run_simulation(ThompsonSampling(), users_df, n_months=12, seed=21)
-    
+
     results_df["policy"] = "thompson_sampling"
-    
+
     # Add oracle for comparison (use same results as thompson for now)
     oracle_df = results_df.copy()
     oracle_df["policy"] = "oracle"
     full_results = pd.concat([results_df, oracle_df], ignore_index=True)
-    
+
     table = build_full_metrics_table(full_results, users_df, oracle_df)
-    
+
     # Check expected columns
     expected_columns = {
         "policy",
@@ -115,7 +115,9 @@ def test_full_metrics_table_has_expected_columns():
         "cold_start_reward",
         "shock_recovery_months",
     }
-    assert expected_columns.issubset(set(table.columns)), f"Missing columns: {expected_columns - set(table.columns)}"
+    assert expected_columns.issubset(
+        set(table.columns)
+    ), f"Missing columns: {expected_columns - set(table.columns)}"
     assert len(table) >= 1, "Table should have at least one row"
 
 
@@ -139,7 +141,6 @@ def test_thompson_learns_best_action():
         counts[bandit.select_action(context, user_id, actions)] += 1
 
     plus_50_pct = counts["plus_50"] / 200
-    print(f"plus_50 selection rate after 50 updates: {plus_50_pct:.1%}")
     assert plus_50_pct > 0.70, (
         f"Thompson should select plus_50 >70% after clear signal, "
         f"got {plus_50_pct:.1%}. Beta distributions not tightening."
@@ -168,5 +169,6 @@ def test_ucb_learns_best_action():
         counts[bandit.select_action(context, user_id, actions)] += 1
 
     plus_50_pct = counts["plus_50"] / 200
-    print(f"UCB plus_50 rate after 30 updates: {plus_50_pct:.1%}")
-    assert plus_50_pct > 0.50, f"UCB should prefer plus_50 after clear signal, got {plus_50_pct:.1%}"
+    assert (
+        plus_50_pct > 0.50
+    ), f"UCB should prefer plus_50 after clear signal, got {plus_50_pct:.1%}"

@@ -18,7 +18,12 @@ class ThompsonSampling(ContextualBandit):
     POSITIVE_MAX = REWARD_POSITIVE_MAX
     NEGATIVE_MIN = REWARD_NEGATIVE_MIN
 
-    def __init__(self, alpha_prior: float = 1.0, beta_prior: float = 1.0, update_weight: float = 2.0):
+    def __init__(
+        self,
+        alpha_prior: float = 1.0,
+        beta_prior: float = 1.0,
+        update_weight: float = 2.0,
+    ):
         if alpha_prior <= 0 or beta_prior <= 0:
             raise ValueError("alpha_prior and beta_prior must be > 0")
         if update_weight <= 0:
@@ -108,14 +113,18 @@ class ThompsonSampling(ContextualBandit):
             self.beta_prior + (1.0 - action_prior) * prior_strength,
         ]
 
-    def _ensure_pair(self, user_id: str, action: str, context: np.ndarray) -> tuple[float, float]:
+    def _ensure_pair(
+        self, user_id: str, action: str, context: np.ndarray
+    ) -> tuple[float, float]:
         segment = self._risk_segment(context)
         key = (segment, str(action))
         if key not in self.params:
             self.params[key] = self._initial_params(segment, action)
         return self.params[key]
 
-    def select_action(self, context: np.ndarray, user_id: str, actions: list[str]) -> str:
+    def select_action(
+        self, context: np.ndarray, user_id: str, actions: list[str]
+    ) -> str:
         if not actions:
             raise ValueError("actions must not be empty")
         if context is None or not np.isfinite(np.asarray(context, dtype=float)).all():
@@ -132,13 +141,17 @@ class ThompsonSampling(ContextualBandit):
         self.last_selected_action = best_action
         return best_action
 
-    def update(self, user_id: str, action: str, reward: float, context: np.ndarray) -> None:
+    def update(
+        self, user_id: str, action: str, reward: float, context: np.ndarray
+    ) -> None:
         if context is None or not np.isfinite(np.asarray(context, dtype=float)).all():
             raise ValueError("context must contain only finite values")
         alpha_beta = self._ensure_pair(user_id, action, context)
         reward_norm = self.normalize_reward(reward)
         alpha_beta[0] = min(1000.0, alpha_beta[0] + self.update_weight * reward_norm)
-        alpha_beta[1] = min(1000.0, alpha_beta[1] + self.update_weight * (1.0 - reward_norm))
+        alpha_beta[1] = min(
+            1000.0, alpha_beta[1] + self.update_weight * (1.0 - reward_norm)
+        )
 
         self.total_updates += 1
 
@@ -157,8 +170,12 @@ class ThompsonSampling(ContextualBandit):
             "alpha_prior": self.alpha_prior,
             "beta_prior": self.beta_prior,
             "update_weight": self.update_weight,
-            "mean_alpha": float(np.mean(alpha_values)) if alpha_values else self.alpha_prior,
-            "mean_beta": float(np.mean(beta_values)) if beta_values else self.beta_prior,
+            "mean_alpha": (
+                float(np.mean(alpha_values)) if alpha_values else self.alpha_prior
+            ),
+            "mean_beta": (
+                float(np.mean(beta_values)) if beta_values else self.beta_prior
+            ),
             "last_selected_action": self.last_selected_action,
         }
 

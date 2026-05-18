@@ -18,11 +18,15 @@ def normalize_two_branch(reward: float) -> float:
     """
     reward_value = float(reward)
     if reward_value > 0.0:
-        scaled = math.log1p(min(reward_value, REWARD_POSITIVE_MAX)) / math.log1p(REWARD_POSITIVE_MAX)
+        scaled = math.log1p(min(reward_value, REWARD_POSITIVE_MAX)) / math.log1p(
+            REWARD_POSITIVE_MAX
+        )
         return 0.5 + 0.5 * scaled
     if reward_value == 0.0:
         return 0.5
-    scaled = math.log1p(min(abs(reward_value), abs(REWARD_NEGATIVE_MIN))) / math.log1p(abs(REWARD_NEGATIVE_MIN))
+    scaled = math.log1p(min(abs(reward_value), abs(REWARD_NEGATIVE_MIN))) / math.log1p(
+        abs(REWARD_NEGATIVE_MIN)
+    )
     return 0.5 - 0.5 * scaled
 
 
@@ -31,5 +35,7 @@ def normalize_symmetric(reward: float) -> float:
     reward_value = float(reward)
     if reward_value == 0.0:
         return 0.0
-    scaled = math.log1p(min(abs(reward_value), REWARD_SCALE_ABS)) / math.log1p(REWARD_SCALE_ABS)
+    scaled = math.log1p(min(abs(reward_value), REWARD_SCALE_ABS)) / math.log1p(
+        REWARD_SCALE_ABS
+    )
     return math.copysign(scaled, reward_value)

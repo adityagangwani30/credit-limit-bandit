@@ -13,7 +13,9 @@ class EpsilonGreedyBandit(ContextualBandit):
 
     REWARD_SCALE = REWARD_SCALE_ABS
 
-    def __init__(self, epsilon: float = 0.15, decay: float = 0.995, min_epsilon: float = 0.01):
+    def __init__(
+        self, epsilon: float = 0.15, decay: float = 0.995, min_epsilon: float = 0.01
+    ):
         if not 0 <= epsilon <= 1:
             raise ValueError("epsilon must be in [0, 1]")
         if not 0 < decay <= 1:
@@ -32,7 +34,9 @@ class EpsilonGreedyBandit(ContextualBandit):
     def _key(self, user_id: str, action: str) -> tuple[str, str]:
         return (str(user_id), str(action))
 
-    def select_action(self, context: np.ndarray, user_id: str, actions: list[str]) -> str:
+    def select_action(
+        self, context: np.ndarray, user_id: str, actions: list[str]
+    ) -> str:
         if not actions:
             raise ValueError("actions must not be empty")
         if context is None or not np.isfinite(np.asarray(context, dtype=float)).all():
@@ -53,7 +57,9 @@ class EpsilonGreedyBandit(ContextualBandit):
         self.last_selected_action = selected_action
         return selected_action
 
-    def update(self, user_id: str, action: str, reward: float, context: np.ndarray) -> None:
+    def update(
+        self, user_id: str, action: str, reward: float, context: np.ndarray
+    ) -> None:
         if context is None or not np.isfinite(np.asarray(context, dtype=float)).all():
             raise ValueError("context must contain only finite values")
         key = self._key(user_id, action)
