@@ -7,10 +7,13 @@ import math
 import numpy as np
 
 from src.bandits.base import ContextualBandit
+from src.reward_constants import REWARD_SCALE_ABS, normalize_symmetric
 
 
 class UCBBandit(ContextualBandit):
     """UCB1-style bandit keyed by (user_id, action)."""
+
+    REWARD_SCALE = REWARD_SCALE_ABS
 
     def __init__(self, c: float = 2.0):
         if c < 0:
@@ -28,22 +31,24 @@ class UCBBandit(ContextualBandit):
             raise ValueError("context must contain only finite values")
 
         self.total_selections += 1
+        unseen = [action for action in actions if self.counts.get(self._key(user_id, action), 0) == 0]
+        if len(unseen) == len(actions):
+            self.last_selected_action = actions[0]
+            return actions[0]
 
-        for action in actions:
-            if self.counts.get(self._key(user_id, action), 0) == 0:
-                self.last_selected_action = action
-                return action
-
-        total_pulls = sum(self.counts[self._key(user_id, action)] for action in actions)
+        total_pulls = sum(self.counts.get(self._key(user_id, action), 0) for action in actions)
         total_pulls = max(total_pulls, 1)
 
         scores: dict[str, float] = {}
         for action in actions:
             key = self._key(user_id, action)
-            count = self.counts[key]
-            mean_reward = self.rewards[key]
-            bonus = self.c * math.sqrt(math.log(total_pulls) / count)
-            scores[action] = mean_reward + bonus
+            count = self.counts.get(key, 0)
+            if count == 0:
+                scores[action] = float("inf")
+            else:
+                mean_reward = self.rewards[key]
+                bonus = self.c * math.sqrt(math.log(total_pulls) / count)
+                scores[action] = mean_reward + bonus
 
         best_action = max(actions, key=lambda action: scores[action])
         self.last_selected_action = best_action
@@ -55,13 +60,18 @@ class UCBBandit(ContextualBandit):
         key = self._key(user_id, action)
         current_count = self.counts.get(key, 0)
         current_mean = self.rewards.get(key, 0.0)
+        reward_norm = self._normalize(reward)
 
         new_count = current_count + 1
-        new_mean = current_mean + (float(reward) - current_mean) / new_count
+        new_mean = current_mean + (reward_norm - current_mean) / new_count
 
         self.counts[key] = new_count
         self.rewards[key] = new_mean
         self.total_updates += 1
+
+    @staticmethod
+    def _normalize(reward: float) -> float:
+        return normalize_symmetric(reward)
 
     def get_stats(self) -> dict:
         reward_values = list(self.rewards.values())

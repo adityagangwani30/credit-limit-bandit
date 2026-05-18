@@ -96,7 +96,7 @@ class RewardBuffer:
             reward_month = recorded_action.action_month + self.delay_months
 
             if current_month >= reward_month and action_key not in self._released_keys:
-                outcome = self._outcomes.get((recorded_action.user_id, reward_month))
+                outcome = self._outcomes.get(action_key)
                 if outcome is None:
                     still_pending.append(recorded_action)
                     continue

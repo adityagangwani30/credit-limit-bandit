@@ -1,5 +1,8 @@
 import unittest
 
+from src.bandits.epsilon_greedy import EpsilonGreedyBandit
+from src.bandits.thompson import ThompsonSampling
+from src.bandits.ucb import UCBBandit
 from src.reward import RewardBuffer, RewardEngine
 
 
@@ -21,7 +24,7 @@ class TestRewardBuffer(unittest.TestCase):
         self.buffer.record_action("USER_00001", 1, "plus_10", self.context)
         self.buffer.receive_outcome(
             user_id="USER_00001",
-            month=4,
+            month=1,
             amount_spent=10000.0,
             outstanding_amount=5000.0,
             did_default=False,
@@ -46,6 +49,34 @@ class TestRewardBuffer(unittest.TestCase):
         self.assertEqual(self.buffer.pending_count(), 1)
         self.buffer.get_ready_rewards(current_month=4)
         self.assertEqual(self.buffer.pending_count(), 0)
+
+
+class TestBanditNormalization(unittest.TestCase):
+    def test_thompson_two_branch_normalization(self) -> None:
+        ts = ThompsonSampling()
+        self.assertEqual(ts.normalize_reward(700_000), 1.0)
+        self.assertGreater(ts.normalize_reward(350_000), 0.9)
+        self.assertEqual(ts.normalize_reward(0), 0.5)
+        self.assertLess(ts.normalize_reward(-13_500_000), 0.1)
+        self.assertEqual(ts.normalize_reward(-27_000_000), 0.0)
+        self.assertGreater(ts.normalize_reward(-26_045_436), 0.0)
+        self.assertLess(ts.normalize_reward(-26_045_436), 0.02)
+        self.assertGreater(ts.normalize_reward(3_655), 0.8)
+        self.assertLess(ts.normalize_reward(3_655), 0.81)
+
+    def test_ucb_symmetric_normalization(self) -> None:
+        ucb = UCBBandit()
+        self.assertEqual(ucb._normalize(27_000_000), 1.0)
+        self.assertEqual(ucb._normalize(-27_000_000), -1.0)
+        self.assertEqual(ucb._normalize(0), 0.0)
+        self.assertGreater(ucb._normalize(3_655), 0.47)
+        self.assertLess(ucb._normalize(3_655), 0.49)
+
+    def test_epsilon_greedy_symmetric_normalization(self) -> None:
+        bandit = EpsilonGreedyBandit()
+        self.assertEqual(bandit._normalize(27_000_000), 1.0)
+        self.assertEqual(bandit._normalize(-27_000_000), -1.0)
+        self.assertEqual(bandit._normalize(0), 0.0)
 
 
 if __name__ == "__main__":

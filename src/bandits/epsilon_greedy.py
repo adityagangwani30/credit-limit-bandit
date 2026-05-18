@@ -5,10 +5,13 @@ from __future__ import annotations
 import numpy as np
 
 from src.bandits.base import ContextualBandit
+from src.reward_constants import REWARD_SCALE_ABS, normalize_symmetric
 
 
 class EpsilonGreedyBandit(ContextualBandit):
     """User-specific epsilon-greedy policy with multiplicative decay."""
+
+    REWARD_SCALE = REWARD_SCALE_ABS
 
     def __init__(self, epsilon: float = 0.15, decay: float = 0.995, min_epsilon: float = 0.01):
         if not 0 <= epsilon <= 1:
@@ -56,13 +59,18 @@ class EpsilonGreedyBandit(ContextualBandit):
         key = self._key(user_id, action)
         current_count = self.counts.get(key, 0)
         current_mean = self.rewards.get(key, 0.0)
+        reward_norm = self._normalize(reward)
 
         new_count = current_count + 1
-        new_mean = current_mean + (float(reward) - current_mean) / new_count
+        new_mean = current_mean + (reward_norm - current_mean) / new_count
 
         self.counts[key] = new_count
         self.rewards[key] = new_mean
         self.total_updates += 1
+
+    @staticmethod
+    def _normalize(reward: float) -> float:
+        return normalize_symmetric(reward)
 
     def get_stats(self) -> dict:
         reward_values = list(self.rewards.values())

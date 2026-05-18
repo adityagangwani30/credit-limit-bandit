@@ -92,6 +92,21 @@ def _simulate_policy(
     month_iterator = tqdm(range(1, n_months + 1), total=n_months, desc=f"{policy_label or 'policy'} months")
     for month in month_iterator:
         selected_actions: dict[str, str] = {}
+        selected_contexts: dict[str, np.ndarray] = {}
+
+        ready_rewards = reward_buffer.get_ready_rewards(current_month=month)
+        for ready_reward in ready_rewards:
+            if bandit is not None:
+                bandit.update(
+                    user_id=ready_reward["user_id"],
+                    action=ready_reward["action"],
+                    reward=float(ready_reward["reward"]),
+                    context=np.asarray(ready_reward["context"], dtype=np.float32),
+                )
+            log_index = row_lookup[(ready_reward["user_id"], ready_reward["action_month"])]
+            logs[log_index]["reward_received"] = float(ready_reward["reward"])
+            logs[log_index]["reward_ready_month"] = month
+            logs[log_index]["reward_is_default"] = bool(ready_reward["is_default"])
 
         for user_index, record in enumerate(user_records, start=1):
             user_id = record["user_id"]
@@ -102,11 +117,10 @@ def _simulate_policy(
             else:
                 action = bandit.select_action(context, user_id, action_space)
 
-            reward_buffer.record_action(user_id, month, action, context)
-
             current_limit = ContextBuilder.apply_action(current_limits[user_id], action)
             current_limits[user_id] = current_limit
             selected_actions[user_id] = action
+            selected_contexts[user_id] = np.asarray(context, dtype=np.float32)
 
             row_lookup[(user_id, month)] = len(logs)
             logs.append(
@@ -157,20 +171,12 @@ def _simulate_policy(
                 outstanding_amount=outcome["outstanding_amount"],
                 did_default=outcome["did_default"],
             )
-
-        ready_rewards = reward_buffer.get_ready_rewards(current_month=month)
-        for ready_reward in ready_rewards:
-            if bandit is not None:
-                bandit.update(
-                    user_id=ready_reward["user_id"],
-                    action=ready_reward["action"],
-                    reward=float(ready_reward["reward"]),
-                    context=np.asarray(ready_reward["context"], dtype=np.float32),
-                )
-            log_index = row_lookup[(ready_reward["user_id"], month)]
-            logs[log_index]["reward_received"] = float(ready_reward["reward"])
-            logs[log_index]["reward_ready_month"] = month
-            logs[log_index]["reward_is_default"] = bool(ready_reward["is_default"])
+            reward_buffer.record_action(
+                user_id=user_id,
+                month=month,
+                action=selected_actions[user_id],
+                context=selected_contexts[user_id],
+            )
 
     results = pd.DataFrame(logs)
     if policy_label is not None:
@@ -282,25 +288,44 @@ def main() -> None:
     parser.add_argument(
         "--policy",
         default="all",
-        choices=["all", "thompson", "ucb", "epsilon_greedy", "static", "oracle"],
+        choices=[
+            "all",
+            "thompson",
+            "thompson_sampling",
+            "ucb",
+            "epsilon_greedy",
+            "static",
+            "static_baseline",
+            "oracle",
+        ],
         help="Run one policy or all policies.",
     )
+    parser.add_argument("--n_months", type=int, default=12, help="Number of months to simulate.")
+    parser.add_argument("--n_users", type=int, default=None, help="Optional cap on number of users.")
     args = parser.parse_args()
 
     users_df = _load_users()
+    if args.n_users is not None:
+        if args.n_users <= 0:
+            raise ValueError("--n_users must be > 0 when provided")
+        users_df = users_df.head(args.n_users).copy()
+
+    if args.n_months <= 0:
+        raise ValueError("--n_months must be > 0")
+
     start_time = time.perf_counter()
     all_results: list[pd.DataFrame] = []
 
-    if args.policy in {"all", "thompson"}:
-        all_results.append(run_simulation(ThompsonSampling(), users_df, n_months=12, seed=42))
+    if args.policy in {"all", "thompson", "thompson_sampling"}:
+        all_results.append(run_simulation(ThompsonSampling(), users_df, n_months=args.n_months, seed=42))
     if args.policy in {"all", "ucb"}:
-        all_results.append(run_simulation(UCBBandit(), users_df, n_months=12, seed=42))
+        all_results.append(run_simulation(UCBBandit(), users_df, n_months=args.n_months, seed=42))
     if args.policy in {"all", "epsilon_greedy"}:
-        all_results.append(run_simulation(EpsilonGreedyBandit(), users_df, n_months=12, seed=42))
-    if args.policy in {"all", "static"}:
-        all_results.append(run_static_baseline(users_df, n_months=12))
+        all_results.append(run_simulation(EpsilonGreedyBandit(), users_df, n_months=args.n_months, seed=42))
+    if args.policy in {"all", "static", "static_baseline"}:
+        all_results.append(run_static_baseline(users_df, n_months=args.n_months))
     if args.policy in {"all", "oracle"}:
-        all_results.append(run_oracle(users_df, n_months=12))
+        all_results.append(run_oracle(users_df, n_months=args.n_months))
 
     combined_results = pd.concat(all_results, ignore_index=True)
     output_path = Path(__file__).resolve().parents[1] / "data" / "simulation_results.csv"

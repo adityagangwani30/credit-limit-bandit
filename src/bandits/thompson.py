@@ -5,10 +5,18 @@ from __future__ import annotations
 import numpy as np
 
 from src.bandits.base import ContextualBandit
+from src.reward_constants import (
+    REWARD_NEGATIVE_MIN,
+    REWARD_POSITIVE_MAX,
+    normalize_two_branch,
+)
 
 
 class ThompsonSampling(ContextualBandit):
     """Beta-Bernoulli Thompson Sampling keyed by (user_id, action)."""
+
+    POSITIVE_MAX = REWARD_POSITIVE_MAX
+    NEGATIVE_MIN = REWARD_NEGATIVE_MIN
 
     def __init__(self, alpha_prior: float = 1.0, beta_prior: float = 1.0):
         if alpha_prior <= 0 or beta_prior <= 0:
@@ -45,18 +53,14 @@ class ThompsonSampling(ContextualBandit):
             raise ValueError("context must contain only finite values")
         alpha_beta = self._ensure_pair(user_id, action)
         reward_norm = self.normalize_reward(reward)
-
-        if reward > 0:
-            alpha_beta[0] = min(1000.0, alpha_beta[0] + reward_norm)
-        else:
-            alpha_beta[1] = min(1000.0, alpha_beta[1] + abs(reward_norm))
+        alpha_beta[0] = min(1000.0, alpha_beta[0] + reward_norm)
+        alpha_beta[1] = min(1000.0, alpha_beta[1] + (1.0 - reward_norm))
 
         self.total_updates += 1
 
     @staticmethod
-    def normalize_reward(reward: float, max_reward: float = 10000) -> float:
-        scaled_reward = float(reward) / float(max_reward)
-        return float(1.0 / (1.0 + np.exp(-scaled_reward)))
+    def normalize_reward(reward: float) -> float:
+        return normalize_two_branch(reward)
 
     def get_stats(self) -> dict:
         alpha_values = [params[0] for params in self.params.values()]
