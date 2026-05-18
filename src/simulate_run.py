@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import argparse
+import sys
 import time
 from pathlib import Path
 from typing import Callable
 
 import numpy as np
 import pandas as pd
+
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.bandits.epsilon_greedy import EpsilonGreedyBandit
 from src.bandits.thompson import ThompsonSampling
@@ -22,7 +26,7 @@ try:
     from tqdm import tqdm
 except ImportError:  # pragma: no cover
     class _TqdmFallback:
-        def __call__(self, iterable=None, total=None, desc=None, leave=True):
+        def __call__(self, iterable=None, total=None, desc=None, leave=True, **kwargs):
             return iterable
 
         @staticmethod
@@ -75,9 +79,7 @@ def _simulate_policy(
 
     working_users = users_df.copy().reset_index(drop=True)
     context_builder = ContextBuilder(working_users)
-    # In the portfolio runner, rewards begin surfacing from month 3 onward so
-    # short development runs still observe delayed feedback.
-    reward_buffer = RewardBuffer(delay_months=2)
+    reward_buffer = RewardBuffer(delay_months=3)
     action_space = context_builder.get_action_space()
     user_records = working_users.to_dict("records")
     user_ids = [record["user_id"] for record in user_records]
@@ -93,7 +95,13 @@ def _simulate_policy(
     logs: list[dict] = []
     row_lookup: dict[tuple[str, int], int] = {}
 
-    month_iterator = tqdm(range(1, n_months + 1), total=n_months, desc=f"{policy_label or 'policy'} months")
+    show_progress = n_users <= 1000
+    month_iterator = tqdm(
+        range(1, n_months + 1),
+        total=n_months,
+        desc=f"{policy_label or 'policy'} months",
+        disable=not show_progress,
+    )
     for month in month_iterator:
         selected_actions: dict[str, str] = {}
         selected_contexts: dict[str, np.ndarray] = {}
@@ -102,8 +110,8 @@ def _simulate_policy(
         for ready_reward in ready_rewards:
             if bandit is not None:
                 bandit.update(
-                    user_id=ready_reward["user_id"],
-                    action=ready_reward["action"],
+                    user_id=str(ready_reward["user_id"]),
+                    action=str(ready_reward["action"]),
                     reward=float(ready_reward["reward"]),
                     context=np.asarray(ready_reward["context"], dtype=np.float32),
                 )
@@ -142,7 +150,7 @@ def _simulate_policy(
                 }
             )
 
-            if user_index % 100 == 0 or user_index == n_users:
+            if show_progress and (user_index % 1000 == 0 or user_index == n_users):
                 tqdm.write(f"Month {month}: processed {user_index}/{n_users} users for {policy_label or 'policy'}")
 
         simulation_input = working_users.copy()

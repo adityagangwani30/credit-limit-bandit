@@ -48,18 +48,28 @@ Every month, we observe a user's financial snapshot and feed it to a bandit poli
 
 ### Policy Comparison (12-month simulation, 10,000 users)
 
-| Policy | Revenue (INR) | Lift vs Static | Regret vs Practical Oracle | Default Rate | Convergence | Exploration |
+| Policy | Revenue (INR) | Lift vs Static | Default Rate | Regret vs Practical Oracle | Convergence | Exploration |
 |---|---:|---:|---:|---:|---:|---:|
-| Thompson Sampling | ₹9.20Cr | −3.79% | 42.19% | 3.38% | Month 5 | 75.29% |
-| UCB | ₹8.56Cr | −10.47% | 46.20% | 3.38% | Month 7 | 82.12% |
-| Epsilon-Greedy | ₹9.41Cr | −1.56% | 40.85% | 3.38% | Month 4 | 8.17% |
-| Static Baseline | ₹9.56Cr | 0% | 39.91% | 3.38% | N/A | 0% |
-| Practical Oracle | ₹15.91Cr | +66.42% | 0% | 3.38% | N/A | N/A |
-| Theoretical Oracle (Reference) | ₹33.40Cr | +249.37% | N/A | 3.38% | N/A | N/A |
+| Thompson Sampling | ₹12.13Cr | +39.09% | 3.38% | 16.34% | Month 9 | 37.61% |
+| UCB | ₹10.83Cr | +24.15% | 3.38% | 25.32% | Month 10 | 43.95% |
+| Epsilon-Greedy | ₹8.70Cr | −0.26% | 3.38% | 40.01% | Month 4 | 6.44% |
+| Static Baseline | ₹8.72Cr | 0% | 3.38% | 39.85% | N/A | 0% |
+| Practical Oracle | ₹14.50Cr | +66.25% | 3.38% | 0% | N/A | N/A |
+| Theoretical Oracle (Reference) | ₹29.40Cr | +237.05% | 3.38% | N/A | N/A | N/A |
 
-> Regret is measured against a **practical oracle** — a policy that knew the single best static action per user for the full 12-month horizon. The theoretical per-month hindsight oracle (₹33.40Cr) is included for completeness but is not a meaningful comparison target for any online policy.
+> Regret measured vs **practical oracle** (best fixed action per user for the full 12 months — a realistic upper bound). Theoretical per-month hindsight oracle = ₹29.40Cr (shown for completeness but not a meaningful online policy target).
 
-> In the current simulator, Thompson Sampling's regret drops from **72.46% vs the theoretical oracle** to **42.19% vs the practical oracle**, which is a materially fairer benchmark even though it remains a challenging ceiling.
+> Thompson Sampling achieves **16.34% regret vs the practical oracle** in month 12. Since the practical oracle has perfect 12-month hindsight per user, a sub-20% gap for an online policy operating under 3-month delayed feedback and cold-start constraints represents strong performance. Regret is still declining at month 12, suggesting further improvement with a longer horizon.
+
+### Target Check
+
+| Target | Latest Result | Status |
+|---|---:|:---:|
+| Revenue lift >30% | +39.09% | ✓ |
+| Default rate <4% | 3.38% | ✓ |
+| Exploration 10–25% | 37.61% | ✗ |
+| Convergence M3–5 | Month 9 | ✗ |
+
 ### Cohort Analysis — Which users benefit most?
 
 | Risk Tier | Revenue (Thompson) | Lift vs Static | Default Rate |
@@ -78,8 +88,8 @@ Every month, we observe a user's financial snapshot and feed it to a bandit poli
 | Challenge | Simulated As | Result |
 |---|---|---|
 | **Delayed reward feedback** | Reward for month T arrives at T+3 | Bandit stays uncertain (wide Beta) during lag; adapts correctly once signal arrives |
-| **Cold start — new users** | First 3 months: no reward history | Feature-based context (CIBIL, income, utilization) guides early decisions; Thompson improved +683.3% from month 1→4 |
-| **Non-stationarity** | Economic shock doubles default rates at month 6 | Thompson maintained 0-month recovery; Beta distributions updated defensively within 1–2 decision cycles |
+| **Cold start — new users** | First 3 months: no reward history | Months 7–12 average reward was 49.1% lower than months 4–6, showing delayed-feedback drag after the initial high-reward release window |
+| **Non-stationarity** | Economic shock doubles default rates at month 6 | `compute_shock_recovery()` returned 0 months to recovery; default rate stayed within 10% of the pre-shock baseline at month 6 |
 | **Reward sparsity** | Defaults are 3.38% of events | Sigmoid normalization prevents rare large penalties from dominating Beta updates |
 
 ---
@@ -195,7 +205,7 @@ else:
 ## Getting Started
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/credit-limit-bandit
+git clone https://github.com/adityagangwani30/credit-limit-bandit
 cd credit-limit-bandit
 python -m venv venv && source venv/bin/activate
 pip install -e .

@@ -103,9 +103,9 @@ class RewardBuffer:
 
                 ready_rewards.append(
                     {
-                        "user_id": recorded_action.user_id,
+                        "user_id": str(recorded_action.user_id),
                         "action_month": recorded_action.action_month,
-                        "action": recorded_action.action,
+                        "action": str(recorded_action.action),
                         "context": deepcopy(recorded_action.context),
                         "reward": RewardEngine.compute_net_reward(
                             outcome.amount_spent,
@@ -120,6 +120,13 @@ class RewardBuffer:
                 still_pending.append(recorded_action)
 
         self._pending_actions = still_pending
+        for reward in ready_rewards:
+            assert isinstance(reward["user_id"], str), (
+                f"user_id must be str, got {type(reward['user_id'])}"
+            )
+            assert isinstance(reward["action"], str), (
+                f"action must be str, got {type(reward['action'])}"
+            )
         return ready_rewards
 
     def pending_count(self) -> int:

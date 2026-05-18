@@ -12,9 +12,9 @@ from src.simulate_run import run_simulation
 from src.simulator import generate_users
 
 
-def test_thompson_integration_run_three_months():
+def test_thompson_integration_run_four_months():
     users_df = generate_users(n=100, seed=21)
-    results_df = run_simulation(ThompsonSampling(), users_df, n_months=3, seed=21)
+    results_df = run_simulation(ThompsonSampling(), users_df, n_months=4, seed=21)
 
     total_reward = float(results_df["reward_received"].sum())
     default_rate = float(results_df["did_default"].mean())
@@ -26,9 +26,11 @@ def test_thompson_integration_run_three_months():
 
     month_1_rewards = results_df.loc[results_df["month"] == 1, "reward_received"]
     month_3_rewards = results_df.loc[results_df["month"] == 3, "reward_received"]
+    month_4_rewards = results_df.loc[results_df["month"] == 4, "reward_received"]
 
     assert (month_1_rewards != 0.0).any()
     assert (month_3_rewards == 0.0).all()
+    assert (month_4_rewards == 0.0).all()
 
 
 def test_convergence_month_is_reasonable():
