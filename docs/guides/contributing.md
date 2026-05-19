@@ -1,45 +1,109 @@
----
-title: Adding a New Bandit Algorithm
-category: guide
-file_reference: none
----
-# Adding a New Bandit Algorithm
+# Contributing: Add a New Bandit Algorithm
 
-This guide explains how to add a new contextual bandit algorithm to the codebase.
+Step-by-step guide to implement a new algorithm (e.g., LinUCB) and integrate into the system.
 
-Step-by-step
-1. Create `src/bandits/your_algorithm.py`.
-2. Inherit from `ContextualBandit` (see `src/bandits/base.py`).
-3. Implement required methods:
-   - `select_action(contexts: np.ndarray) -> np.ndarray` — returns action indices for batch contexts
-   - `update(actions, rewards, contexts=None)` — perform posterior or statistics updates
-   - `get_stats()` — return diagnostic counters
-   - `reset()` — reset internal state for experiments
-4. Add your algorithm to the policy registry in `src/simulate_run.py` so it is invocable via `--policy`.
-5. Add visualization hooks in `dashboard/app.py` if you want per-policy tracing.
-6. Write unit tests in `tests/test_your_algorithm.py` covering select/update/reset behavior.
+## 6 Steps to Add New Algorithm
 
-Interface contract
-- `select_action` receives a 2D numpy array `(n, d)` and returns a 1D integer array of length `n` of action indices.
-- `update` will be called with the same action codes and normalized rewards in [0,1]. Implementations must be resilient to delayed updates (i.e., handle updates arriving out-of-order by month).
+### Step 1: Create Algorithm File
 
-Example skeleton (LinUCB)
+Create `src/bandits/your_algorithm.py`:
+
 ```python
-class LinUCB(ContextualBandit):
-    def __init__(self, d, alpha=1.0):
-        # initialize A and b per action
+from src.bandits.base import ContextualBandit
+import numpy as np
+
+class YourBandit(ContextualBandit):
+    def __init__(self):
+        self.reset()
+    
+    def select_action(self, context, user_id, actions):
+        # Your implementation
+        return actions[0]  # placeholder
+    
+    def update(self, user_id, action, reward, context):
+        # Your implementation
         pass
-    def select_action(self, contexts):
-        # compute p = theta.T x + alpha * uncertainty
-        pass
-    def update(self, actions, rewards, contexts=None):
-        # ridge update for selected arms
+    
+    def get_stats(self):
+        return {"algorithm": "your_algorithm"}
+    
+    def reset(self):
         pass
 ```
 
-Testing & integration
-- Add tests that run `simulate_run.py` with `--n_users 1000` and assert metrics are within expected ranges for trivial deterministic scenarios.
+### Step 2: Implement Interface Contract
 
-Related docs
-- [docs/guides/getting-started.md](docs/guides/getting-started.md)
-- [docs/algorithms/comparison.md](docs/algorithms/comparison.md)
+| Method | Signature | Purpose |
+|--------|-----------|---------|
+| select_action | (context: np.ndarray, user_id: str, actions: list[str]) → str | Return action name |
+| update | (user_id: str, action: str, reward: float, context: np.ndarray) → None | Update from delayed reward |
+| get_stats | () → dict | Return stats dict with "algorithm" key |
+| reset | () → None | Reset to initial state |
+
+### Step 3: Integration
+
+Edit `src/simulate_run.py`:
+
+```python
+from src.bandits.your_algorithm import YourBandit
+
+if policy_name == "your_algorithm":
+    bandit = YourBandit()
+```
+
+### Step 4: Testing
+
+```bash
+pytest tests/test_your_algorithm.py -v
+```
+
+Write tests covering: initialization, select_action, update, cold-start behavior.
+
+### Step 5: Benchmarking
+
+```bash
+python src/simulate_run.py --policy your_algorithm --n_users 1000 --n_months 12
+```
+
+Compare revenue vs Thompson (₹12.13Cr), UCB (₹10.83Cr).
+
+### Step 6: Documentation
+
+Document in `docs/algorithms/your_algorithm.md` with:
+- Algorithm intuition
+- Hyperparameters
+- Pros/cons
+- Performance results
+
+## LinUCB Skeleton Example
+
+LinUCB (Contextual UCB) uses linear models + confidence bounds:
+
+```python
+class LinUCBBandit(ContextualBandit):
+    def __init__(self, alpha=1.0):
+        self.alpha = alpha
+        self.reset()
+    
+    def reset(self):
+        self.A = {}  # Design matrix per action
+        self.b = {}  # Reward vector per action
+    
+    def select_action(self, context, user_id, actions):
+        scores = {}
+        for action in actions:
+            # A_inv @ b estimates theta
+            # theta · context is mean reward
+            # + alpha * sqrt(context^T A_inv context) is UCB bound
+            scores[action] = self._ucb_score(context, action)
+        return max(actions, key=lambda a: scores[a])
+    
+    def update(self, user_id, action, reward, context):
+        # Update A, b for action's linear model
+        pass
+```
+
+## Related Docs
+
+- [thompson-sampling.md](../algorithms/thompson-sampling.md)
+- [ucb.md](../algorithms/ucb.md)

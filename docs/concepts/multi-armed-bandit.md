@@ -1,35 +1,42 @@
----
-title: What is a Multi-Armed Bandit?
-category: concept
-file_reference: none
----
-# What is a Multi-Armed Bandit?
+# Multi-Armed Bandit Concept
 
-The multi-armed bandit (MAB) is a formalism for sequential decision-making under uncertainty. Imagine a row of slot machines ("arms"); each has unknown payout distribution. You can pull one arm per timestep and observe its payout; your objective is to maximize cumulative reward over a horizon by balancing exploration (learning about arms) and exploitation (choosing arms believed to be best).
+A bandit is a decision-making framework where an agent repeatedly chooses from K actions, receives reward, and learns which actions are best.
 
-Casino analogy → credit limits
-- Arms: actions (discrete limit change options) applied to users.
-- Pull: selecting an action for a specific user at timestep t.
-- Reward: net economic outcome (interchange revenue minus default penalty) observed after a delay.
+## Casino Slot Machine Analogy
 
-Why "bandit" fits
-- The problem is sequential with partial feedback: each decision yields feedback only for the chosen action, unlike supervised datasets with complete labels.
+- **Slots:** 4 machines (keep, plus_10, plus_20, plus_50 credit limit increases)
+- **Reward:** Payout (interchange ₹900, or loss −₹24,550 if default)
+- **Goal:** Maximize total payout
+- **Challenge:** Don't know which machine is best without trying (exploration needed)
 
-Contextual vs non-contextual bandits
-- Non-contextual: choose the same arm population-wide (no personalization).
-- Contextual: observe a context vector x_t for each user at time t and choose action a_t = π(x_t). This project uses contextual bandits to tailor credit limits to individual users.
+In credit: trying plus_50 for a risky user might default (−₹2M loss). Exploration is costly.
 
-Formal problem definition
-- At each timestep t:
-  1. Observe context x_t
-  2. Choose action a_t from finite action set A
-  3. Receive reward r_t (possibly delayed)
-  4. Update policy to maximize sum_{t=1..T} r_t
+## Formal Problem Definition
 
-Why not supervised learning or full RL
-- Supervised learning predicts labels but does not produce data for counterfactual actions and suffers from selection bias when deployed.
-- Full RL models state transitions and long-term effects; here, actions affect near-term rewards with delayed observation but do not require full MDP formalism for this demonstration.
+State: user context (10 features) | Action: a ∈ {keep, plus_10, plus_20, plus_50} | Reward: r ∈ [−₹27M, ₹700K] | Delay: 3 months
 
-Related docs
-- [docs/concepts/exploration-exploitation.md](docs/concepts/exploration-exploitation.md)
-- [docs/algorithms/thompson-sampling.md](docs/algorithms/thompson-sampling.md)
+Objective: maximize cumulative reward over 12 months = Σ rewards across all users and actions, subject to default rate constraint (3.38%).
+
+## Contextual vs Non-Contextual
+
+- **Contextual:** Action selection depends on user context (CIBIL, income, utilization). Thompson Sampling is contextual (different posteriors per risk segment).
+- **Non-contextual:** Action selection ignores context (epsilon-greedy in basic form). Pure MAB, not tailored to user risk profile.
+
+Credit demands contextual: Prime users should get plus_50 more often; Deep-Subprime should get keep only.
+
+## Why Not Supervised Learning?
+
+Supervised learning (predict default probability) is NOT the same as credit limit optimization. Classifying "will this user default?" ≠ "what limit maximizes portfolio revenue?" Bandit directly optimizes revenue; classification optimizes a proxy.
+
+## Why Not A/B Testing?
+
+A/B tests fix a control group on old policy, test group on new. Bandits adapt continuously per user. Over 12 months, A/B wastes months 1-6 on control, then slowly ramps test. Bandits learn in 1 month and adapt.
+
+## Why Not Full Reinforcement Learning (MDP)?
+
+Full RL (Markov Decision Process) models future states: "if I increase limit now, user's utilization changes next month." Credit defaults are nearly independent of limit history (driven by external income/unemployment shocks). State transitions are weak, so MDP complexity is unjustified. Contextual bandit (single-step, delayed reward) is the right abstraction.
+
+## Related Docs
+
+- [exploration-exploitation.md](exploration-exploitation.md)
+- [delayed-feedback.md](delayed-feedback.md)

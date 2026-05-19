@@ -1,35 +1,46 @@
----
-title: Delayed Reward Feedback
-category: concept
-file_reference: src/reward.py
----
-# Delayed Reward Feedback
+# Delayed Feedback: The 3-Month Lag
 
-In many financial products, the full consequences of a decision (e.g., increasing a credit limit) are only visible after several months. This file explains why delayed feedback breaks naive bandit updates and how this project addresses it with a `RewardBuffer`.
+Credit decisions (Month 1) yield default outcomes (Month 4). This 3-month delay fundamentally shapes bandit learning.
 
-The problem
-- Action at month T can cause spending that looks positive in month T+1 but the borrower might default in month T+3, erasing earlier gains. If a bandit updates immediately on spend, it can receive false positive signals.
+## Why 3 Months?
 
-Project approach
-- Use a 3-month delay: outcomes associated with an action at T are released at T+3. The `RewardBuffer` stores (action, outcome) tuples with a `release_month` and only feeds updates when due.
+- Month 1: User receives increased limit
+- Month 2: User may miss a payment (not yet marked default)
+- Month 3: Typically marked as delinquent after 90 days
+- Month 4: Default outcome observed, reported to bureau
 
-Diagram (delay)
-``text
-T: choose action -> simulator logs intermediate spends
-T+1/T+2: intermediate signals available but not used for update
-T+3: final outcome (default/no-default, outstanding) released -> update()
-``
+The system cannot know Month 1 outcomes until Month 4.
 
-Why 3 months
-- Three months capture most early default outcomes for revolving credit while keeping an actionable simulation horizon of 12 months.
+## RewardBuffer Timeline
 
-Algorithmic implications
-- Policies must continue to act during the buffer window without fresh reward feedback; priors and uncertainty must guide decisions.
-- Thompson Sampling naturally keeps posterior variance high until rewards are released; UCB relies on counts and can be overly confident if naive immediate counts are used.
+```
+Month 1        Month 2        Month 3        Month 4
+Action 1    | Action 2    | Action 3    | Release 1
+(pending)   | (pending)   | (pending)   | (update policy)
+                                        | Action 4 starts
+```
 
-Production notes
-- For longer delays in production, techniques include importance weighting, off-policy evaluation using logged propensities, and discounting older evidence.
+This creates overlap: at Month 4, three cohorts (Actions 2, 3, 4) are in flight while Action 1 feedback arrives.
 
-Related docs
-- [docs/components/reward-engine.md](docs/components/reward-engine.md)
-- [docs/concepts/non-stationarity.md](docs/concepts/non-stationarity.md)
+## Cold-Start Overlap (Months 1-3)
+
+Months 1-3 have ZERO reward signal (nothing arrives until Month 4). The bandit is purely exploratory using uninformed Beta(1,1) priors. This is the "cold-start" period.
+
+Thompson maintains wide posteriors during Months 1-3 (all features matter equally). When Month 4 feedback arrives, posteriors immediately sharpen on actions that performed well in Month 1.
+
+Epsilon-Greedy's epsilon decay (0.995^t) is independent of this. ε = 0.50 in Month 1, ε = 0.45 in Month 4, regardless of when feedback actually arrives. This mismatch causes lock-in to early-lucky actions.
+
+## How Thompson Adapts
+
+Month 1: Beta(1,1) for all actions (exploring all equally)
+Month 2: Beta(1,1) still (no signal yet)
+Month 3: Beta(1,1) still
+Month 4: Month 1 feedback → posteriors diverge (e.g., plus_10 → Beta(95, 5), keep → Beta(88, 12))
+Month 5: Policies shift based on actual Month 1 outcomes → ₹1.20Cr revenue (vs Month 4's ₹0.92Cr)
+
+Thompson's posterior updates compensate for the 3-month lag by adapting immediately when feedback arrives.
+
+## Related Docs
+
+- [cold-start.md](cold-start.md)
+- [non-stationarity.md](non-stationarity.md)

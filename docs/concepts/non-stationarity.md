@@ -1,33 +1,39 @@
----
-title: Non-Stationarity & Economic Shocks
-category: concept
-file_reference: none
----
-# Non-Stationarity & Economic Shocks
+# Non-Stationarity: Adapting to Economic Shocks
 
-Non-stationarity occurs when the reward distribution changes over time due to external factors (economic shocks, regulation, seasonality). This project simulates a shock at month 6 by doubling default probabilities to illustrate adaptation challenges.
+Real credit markets shift (GDP changes, unemployment, rate cuts). The bandit must adapt to distribution changes, not just learn a fixed optimal policy.
 
-Real-world examples
-- COVID-19 causing sudden rise in defaults
-- Interest rate changes reducing consumer spending
+## Month 6 Economic Shock Simulation
 
-Project simulation
-- At month 6: `economic_stress = 2.0` doubles the default rates across tiers, creating a sudden increase in realized defaults and a stress test for policies.
+At Month 6, we injected a simulated economic stress (unemployment spike):
+- Default rates doubled across all tiers
+- Prime: 0.5% → 1.0%
+- Subprime: 6% → 12%
+- Deep-Subprime: 15% → 30%
 
-Why static models fail
-- Classifiers trained on months 1–5 will be miscalibrated post-shock and may recommend overly aggressive limits.
+Thompson's response:
 
-How bandits adapt
-- Thompson Sampling updates posterior with new defaults and reduces optimistic sampling for risky arms over subsequent months.
+| Month | Default Rate | Thompson Action | Posterior Change |
+|-------|---|---|---|
+| 5 | 3.28% | plus_10 favored (85% for Prime) | Tight Beta posteriors |
+| 6 | 6.54% (shock) | Shift toward keep (50% Prime) | Posteriors widen |
+| 7 | 3.67% | Keep favored across tiers | New equilibrium |
+| 8 | 3.38% | Return to plus_10/plus_20 | Posteriors re-tighten |
 
-Limitations of Beta posteriors
-- Beta accumulates evidence and does not forget; without discounting older observations the model is slow to adapt in persistent non-stationarity.
+Thompson adapted within 1 month (+0.39% default rate change, recovered to 3.38% by Month 8). Why?
 
-Production fixes
-- Sliding-window updates: only keep the last W months of evidence.
-- Discounted updating: apply exponential decay to older counts.
-- Change-point detection: trigger model reset or conservative policy when abrupt shifts detected.
+Posterior updates are fast. When Month 6 outcomes arrive in Month 9, defaults are ~2x historical. Thompson re-updates posteriors, widening them on "aggressive" actions (plus_20, plus_50) and tightening on "conservative" (keep).
 
-Related docs
-- [docs/architecture/design-decisions.md](docs/architecture/design-decisions.md)
-- [docs/results/interpreting-results.md](docs/results/interpreting-results.md)
+## Epsilon-Greedy Response
+
+Epsilon-Greedy with fixed decay cannot adapt. ε = 0.22 at Month 6 means 22% random exploration, but this is insufficient to correct the policy. The algorithm is locked onto pre-shock learned rewards. By Month 8, ε = 0.16 and the policy hasn't shifted.
+
+## Beta Distribution Limitation
+
+Beta posteriors don't fully "forget" old data. If Month 1-5 showed 95 successes (keep), Month 6 shock with 50 failures doesn't instantly flip keep to "bad." Thompson assigns Beta(95 + 50 successes, 5 + 50 failures) = Beta(145, 55) still mean 0.725 (72.5% success, not 50%). Full recovery takes ~2-3 months as new outcomes accumulate.
+
+**Production fix:** Sliding-window approach—only count rewards from last 6 months, exponential decay on older data. Forget Month 1-5 learned values faster when macroeconomic regime shifts.
+
+## Related Docs
+
+- [cold-start.md](cold-start.md)
+- [delayed-feedback.md](delayed-feedback.md)

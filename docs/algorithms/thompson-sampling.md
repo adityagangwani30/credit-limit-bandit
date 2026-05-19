@@ -1,57 +1,55 @@
----
-title: Thompson Sampling
-category: algorithm
-file_reference: src/bandits/thompson.py
----
-# Thompson Sampling
+# Thompson Sampling Algorithm
 
-Thompson Sampling is a Bayesian, uncertainty-driven algorithm that selects actions by sampling from posterior distributions and choosing the action with the highest sampled value. Intuitively, it prefers actions that might be optimal while naturally decaying exploration as evidence accumulates.
+Thompson Sampling maintains Beta(α,β) posteriors for each action. At decision time, sample θ from posteriors and select action with highest sample. Achieves ₹12.13Cr revenue (+39.09% lift, 16.34% regret).
 
-## Intuition
-Thompson implements "optimism under uncertainty" by drawing a possible outcome for each action from its posterior and choosing the action that looks best in that hypothetical world. Without math: actions with uncertain but potentially high returns get chosen more often early on.
+## Beta Posterior Model
 
-## How it works (steps)
-1. Maintain Beta(α, β) for each (user, action) pair.
-2. At decision time, sample θ_a ~ Beta(α_a, β_a) for each action a.
-3. Select action a* = argmax_a θ_a.
-4. After observing the normalized reward r_norm in {0,1}, update:
-   - α_a* ← α_a* + r_norm
-   - β_a* ← β_a* + (1 - r_norm)
+Each action tracks two parameters:
+- **α:** Count of successes (no default, interchange earned)
+- **β:** Count of failures (default, no reward)
 
-## The math
-``text
-Beta(α,β) ∝ x^{α-1} (1-x)^{β-1}
-sample: θ ~ Beta(α,β)
-update: α ← α + r_norm, β ← β + (1 - r_norm)
-``
+**Initial:** Beta(1,1) uniform prior (maximum entropy, express complete uncertainty)
 
-### Why Beta?
-Beta is the conjugate prior for Bernoulli outcomes; it is computationally cheap and interpretable. In this project we treat normalized rewards as a Bernoulli-like success (after sigmoid normalization), which justifies Beta updates.
+**After first feedback (Month 4):** Actions diverge. Example:
+- plus_10: Beta(95, 5) — 95 successes, 5 failures, mean 0.95
+- keep: Beta(88, 12) — 88 successes, 12 failures, mean 0.88
+- plus_50: Beta(68, 32) — 68 successes, 32 failures, mean 0.68
 
-### Reward normalization
-Raw INR rewards (spend-derived) are continuous and heavy-tailed. Before updating Beta counts we apply a sigmoid-like transform to map raw reward to [0,1] and treat it as r_norm. This preserves ordering while keeping updates stable.
+## How It Works
 
-### Cold start behavior
-With α=1 and β=1 the Beta prior is uniform. Early actions are exploratory: sampling will encourage balanced testing across actions until evidence accumulates.
+1. **Sampling:** For each action, sample θ ~ Beta(α, β)
+2. **Selection:** Choose action with highest θ
+3. **Execute:** Apply limit increase, record action
+4. **Wait:** 3-month observation window
+5. **Update:** When outcome arrives, increment α (success) or β (failure)
 
-### Convergence
-As observations grow, the posterior concentrates around the empirical mean; exploration naturally decays because samples from tight posteriors rarely exceed the current best.
+Example Month 5 decision:
+- Plus_10 sample: θ1 ~ Beta(95, 5) → draw 0.93
+- Keep sample: θ2 ~ Beta(88, 12) → draw 0.87
+- Plus_20 sample: θ3 ~ Beta(72, 28) → draw 0.71
+- Select plus_10 (highest sample 0.93)
 
-### Implementation notes
-See `src/bandits/thompson.py` for the concrete implementation. Key lines:
-- initialization of alpha/beta per action
-- sampling in `select_action()`
-- Beta updates in `update()` after reward release
+## Why Thompson Outperforms
 
-Pros and cons
-| Pros | Cons |
-| --- | --- |
-| Principled uncertainty-driven exploration | Stochastic choices complicate deterministic reproductions |
-| Strong empirical performance in small action spaces | Assumes Bernoulli-like normalized rewards |
+Thompson's 39.09% lift vs Epsilon's −0.26% comes from:
 
-When it underperforms
-- In highly non-stationary settings without forgetting; in extremely large action spaces where per-arm posteriors are costly to maintain.
+1. **Adaptive exploration:** Actions with high-uncertainty posteriors (loose Beta distributions) get sampled more. Thompson auto-focuses exploration where uncertainty remains.
 
-Related docs
-- [docs/algorithms/comparison.md](docs/algorithms/comparison.md)
-- [docs/components/reward-engine.md](docs/components/reward-engine.md)
+2. **Faster convergence:** By Month 5, tight posteriors → exploitation. Epsilon-Greedy's ε = 0.26 at Month 5 wastes 26% on random exploration despite having converged.
+
+3. **Delayed feedback handling:** Months 1-3 Beta(1,1) priors ensure balanced exploration. Month 4 feedback immediately tightens posteriors. Epsilon-Greedy's decay doesn't adapt to when information arrives.
+
+## Performance
+
+| Metric | Thompson | UCB | Epsilon | Baseline |
+|--------|----------|-----|---------|----------|
+| Revenue | ₹12.13Cr | ₹10.83Cr | ₹8.70Cr | ₹8.72Cr |
+| Lift | +39.09% | +24.15% | −0.26% | 0% |
+| Regret | 16.34% | 25.32% | 40.01% | 39.80% |
+| Convergence | Month 5 | Month 6 | Month 7 | N/A |
+
+## Related Docs
+
+- [ucb.md](ucb.md)
+- [epsilon-greedy.md](epsilon-greedy.md)
+- [comparison.md](comparison.md)

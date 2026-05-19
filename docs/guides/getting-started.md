@@ -1,54 +1,81 @@
----
-title: Getting Started
-category: guide
-file_reference: none
----
 # Getting Started
 
-Prerequisites
-- Python 3.11+ · git · 4GB RAM
+Prerequisites & installation for Mac/Linux/Windows. Verify with pytest. Run first simulation in 2 commands.
 
-Quick setup (copy-paste)
+## Prerequisites
+
+- Python 3.10+
+- pip (or conda)
+- ~2GB disk (for synthetic_users.csv, notebooks)
+- 10 minutes setup
+
+## Install (All Platforms)
+
 ```bash
-git clone https://github.com/your-org/credit-limit-bandit.git
+# Clone repo
+git clone <repo_url>
 cd credit-limit-bandit
-python -m venv .venv
-# Windows
-.venv\Scripts\Activate.ps1
-# macOS / Linux
-source .venv/bin/activate
-pip install -e .
+
+# Create venv
+python -m venv venv
+
+# Activate
+# Mac/Linux:
+source venv/bin/activate
+# Windows:
+venv\Scripts\Activate
+
+# Install
 pip install -r requirements.txt
+pip install -e .
 ```
 
-Generate synthetic data
-```bash
-python src/simulator.py --n_users 10000 --seed 42
-```
-- Output: `data/simulation_results.csv` (per-user/month rows). Validate aggregate default rate in `data/`.
+## Verify Install
 
-Run a full simulation
-```bash
-python src/simulate_run.py --policy all --n_months 12
-```
-- Expected runtime: ~3 minutes for `n_users=10000` on a modern laptop; CPU-only.
-
-Launch the dashboard
-```bash
-streamlit run dashboard/app.py
-```
-- First load shows portfolio overview. Use sliders on Live Simulation page to run quick scenarios.
-
-Run tests
 ```bash
 pytest tests/ -v
+# Should pass all 22 tests
 ```
 
-Common errors & fixes
-- `ModuleNotFoundError: src` → run `pip install -e .` to register package in editable mode.
-- `FileNotFoundError: data/simulation_results.csv` → run `python src/simulator.py` or `python src/simulate_run.py`.
-- Streamlit port conflict → `streamlit run dashboard/app.py --server.port 8502`
+## Quick Start: 2 Commands
 
-Related docs
-- [docs/guides/running-simulations.md](docs/guides/running-simulations.md)
-- [docs/guides/dashboard.md](docs/guides/dashboard.md)
+```bash
+# 1. Generate synthetic users
+python -c "from src.simulator import generate_users; df = generate_users(1000); df.to_csv('data/synthetic_users.csv', index=False)"
+
+# 2. Run 12-month simulation
+python src/simulate_run.py --policy thompson_sampling --n_months 12 --n_users 1000
+# Output: simulation_results.csv
+```
+
+## Common Errors & Fixes
+
+### ModuleNotFoundError: No module named 'src'
+
+**Cause:** PYTHONPATH doesn't include project root.
+
+**Fix:**
+```bash
+export PYTHONPATH="${PYTHONPATH}:$(pwd)"  # Mac/Linux
+set PYTHONPATH=%PYTHONPATH%;%CD%          # Windows
+```
+
+### FileNotFoundError: data/synthetic_users.csv not found
+
+**Cause:** Users CSV doesn't exist yet.
+
+**Fix:** Run generate_users (Quick Start step 1).
+
+### Port already in use (Streamlit)
+
+**Cause:** Port 8501 occupied.
+
+**Fix:**
+```bash
+streamlit run dashboard/app.py --server.port 8502
+```
+
+## Related Docs
+
+- [running-simulations.md](running-simulations.md)
+- [dashboard.md](dashboard.md)

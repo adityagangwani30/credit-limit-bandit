@@ -1,40 +1,56 @@
----
-title: Reward Engine & Delayed Feedback
-category: component
-file_reference: src/reward.py
----
-# Reward Engine & Delayed Feedback
+# Reward Engine Component
 
-The Reward Engine converts simulator outcomes into net rewards the bandit can learn from, while the RewardBuffer enforces a 3-month delay between action and learning signal.
+Computes monthly rewards from spending and defaults. Positive: 1.8% interchange fee on spend (max ₹700,000). Negative: full outstanding if default (min −₹27,000,000).
 
-Reward formula
-- net_reward = (amount_spent × 0.018) - (outstanding_amount × did_default)
+## Reward Formula
 
-Explanation
-- `amount_spent × 0.018`: estimated interchange revenue (1.8%) from spend charged to the card.
-- `outstanding_amount × did_default`: full outstanding loss when a default occurs (conservative penalty).
+net_reward = (amount_spent × 0.018) - (outstanding × did_default)
 
-Examples
-- Prime user spends ₹50,000 and does not default → reward = 50,000 × 0.018 = ₹900
-- Subprime user defaults with ₹20,000 outstanding → reward = -20,000
+## Worked Example 1: Prime user, no default
 
-Why 1.8%
-- Reflects a representative interchange-like net revenue rate for card transactions in the project context; the value is a domain assumption and can be tuned in `src/reward.py`.
+- amount_spent = ₹50,000
+- outstanding_amount = ₹8,000 (16% of spend)
+- did_default = False
+- reward = (₹50,000 × 0.018) - (₹8,000 × 0) = **₹900**
 
-Delayed feedback handling
-- Actions in month T produce outcomes that may only be fully attributable at month T+3. To avoid premature updates, the `RewardBuffer` stores outcome rows with `release_month = action_month + 3`.
-- When the simulation advances to month R, the buffer releases rewards whose `release_month <= R` to the bandit `update()` API.
+This reward updates Thompson Beta: α += 1 (success). Repeated 95 times with similar outcomes + 5 defaults gives Beta(96, 6).
 
-What happens if a user defaults during the delay
-- The default flag is stored in the buffered outcome. When released, the reward will include the negative penalty and the bandit updates accordingly.
+## Worked Example 2: Subprime user, defaults
 
-Normalization for bandit updates
-- Raw INR rewards are heavy-tailed; before updating Beta posteriors we apply a sigmoid normalization to map rewards into (0,1). This preserves reward ordering and stabilizes Beta-count updates.
+- amount_spent = ₹25,000
+- outstanding_amount = ₹25,000 (100% of spend, didn't pay anything back)
+- did_default = True
+- reward = (₹25,000 × 0.018) - (₹25,000 × 1) = ₹450 - ₹25,000 = **−₹24,550**
 
-Edge cases
-- First 3 months: the buffer contains no released rewards — policies must operate without updates (pure prior-driven exploration).
-- Missing outcomes: if simulator fails to produce a row, the buffer logs and skips the update; tests assert full coverage.
+This updates Thompson Beta: β += 1 (failure). Subprime cohort shows higher failure rate (25-30% default), leading to tight posteriors favoring "keep" action over "plus_10"/"plus_20".
 
-Related docs
-- [docs/architecture/data-flow.md](docs/architecture/data-flow.md)
-- [docs/algorithms/thompson-sampling.md](docs/algorithms/thompson-sampling.md)
+## Normalization Constants
+
+Two-branch linear normalization for reward before Beta update:
+
+| Constant | Value | Purpose |
+|----------|-------|---------|
+| POSITIVE_MAX | ₹700,000 | Cap on positive rewards (annual interchange limit) |
+| NEGATIVE_MIN | −₹27,000,000 | Cap on negative rewards (largest bulk default loss) |
+
+Normalization: if reward > 0, map to (0.5, 1.0]; if < 0, map to [0.0, 0.5). Maps ₹700K → 1.0, ₹0 → 0.5, −₹27M → 0.0.
+
+## RewardBuffer: 3-Month Delay Mechanics
+
+Buffer holds actions for 3 months before releasing for policy updates.
+
+| Month | Action Taken | Stored State | Released from Buffer |
+|-------|--------------|--------------|----------------------|
+| 1 | 10,000 actions | Pending | None (month < 4) |
+| 2 | 10,000 actions | Pending | None |
+| 3 | 10,000 actions | Pending | None |
+| 4 | 10,000 actions | Pending | Month 1 outcomes (10,000) → update |
+| 5 | 10,000 actions | Pending | Month 2 outcomes (10,000) → update |
+
+The buffer matches (user_id, action_month) to (user_id, outcome_month) and releases at month = action_month + 3.
+
+## Related Docs
+
+- [simulator.md](simulator.md)
+- [context-builder.md](context-builder.md)
+- [evaluation.md](evaluation.md)
